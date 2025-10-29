@@ -1,26 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 export default function Home() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
-
-  useEffect(() => {
-    // Redirect to dashboard if user is already logged in
-    if (!loading && user) {
-      router.replace('/dashboard');
-    }
-  }, [user, loading, router]);
-
-  // Only hide page if user is logged in and redirecting
-  // Show landing page while checking auth status
-  if (!loading && user) {
-    return null; // Redirect happening, don't show anything
-  }
+  // No auto-redirect - users can browse landing page freely
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
