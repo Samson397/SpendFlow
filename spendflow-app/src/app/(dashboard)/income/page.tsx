@@ -109,7 +109,7 @@ export default function IncomePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-5xl font-serif text-slate-100 mb-2 tracking-wide">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 tracking-wide">
             I N C O M E
           </h1>
           <p className="text-slate-400 text-sm tracking-widest uppercase">Revenue Overview</p>

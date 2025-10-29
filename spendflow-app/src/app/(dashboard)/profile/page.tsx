@@ -11,7 +11,7 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="text-center">
         <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
-        <h1 className="text-5xl font-serif text-slate-100 mb-4 tracking-wide">
+        <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-4 tracking-wide">
           P R O F I L E
         </h1>
         <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>

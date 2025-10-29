@@ -80,7 +80,7 @@ export const dashboardService = {
       recentTransactions.map(async (transaction) => {
         if (!transaction.cardId) return transaction;
         const card = await cardsService.get(transaction.cardId);
-        return { ...transaction, card };
+        return { ...transaction, card: card || undefined };
       })
     );
 

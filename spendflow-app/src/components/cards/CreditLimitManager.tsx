@@ -64,6 +64,7 @@ export function CreditLimitManager({
   };
 
   return (
+    <>
     <div className="space-y-6">
       {/* Credit Utilization Display */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
@@ -120,10 +121,10 @@ export function CreditLimitManager({
       </div>
 
       {/* Request Increase Modal */}
-      {isOpen && (
+      {showRequestForm && (
         <div
           className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setIsOpen(false)}
+          onClick={() => setShowRequestForm(false)}
         >
           <div
             className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-lg w-full"
@@ -138,7 +139,7 @@ export function CreditLimitManager({
                 <p className="text-slate-500 text-sm">{cardName}</p>
               </div>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={() => setShowRequestForm(false)}
                 className="text-slate-400 hover:text-slate-200 transition-colors"
               >
                 <X className="h-6 w-6" />
@@ -207,7 +208,7 @@ export function CreditLimitManager({
             <div className="flex items-center justify-end gap-4 p-6 border-t border-slate-800 bg-slate-900/30">
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => setShowRequestForm(false)}
                 className="px-6 py-3 border border-slate-700 text-slate-300 hover:border-slate-600 hover:text-slate-200 transition-colors tracking-wider uppercase text-sm"
               >
                 Cancel
@@ -223,6 +224,7 @@ export function CreditLimitManager({
           </div>
         </div>
       )}
+    </div>
     </>
   );
 }

@@ -40,11 +40,14 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         userId: user.uid,
         name: formData.name,
         lastFour: formData.lastFour,
+        cardNumber: `****${formData.lastFour}`,
+        cardHolder: user.displayName || 'Card Holder',
+        expiryDate: '12/25',
+        cvv: '***',
         balance: parseFloat(formData.balance) || 0,
         type: formData.type,
         color: formData.color,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        isActive: true,
       });
       
       onSuccess();

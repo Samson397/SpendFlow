@@ -33,6 +33,8 @@ export default function Dashboard() {
   const [cards, setCards] = useState<CardType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
+  const hasCards = cards.length > 0;
   const [stats, setStats] = useState({
     totalBalance: 0,
     income: 0,
@@ -108,6 +110,17 @@ export default function Dashboard() {
     fetchData();
   };
 
+  const handleAddTransactionClick = () => {
+    if (!hasCards) {
+      setShowNoCardsMessage(true);
+      setTimeout(() => {
+        router.push('/cards');
+      }, 2000);
+      return;
+    }
+    setShowTransactionModal(true);
+  };
+
   return (
     <div className="space-y-12">
       {/* Add Transaction Modal */}
@@ -116,16 +129,38 @@ export default function Dashboard() {
         onClose={() => setShowTransactionModal(false)}
         onSuccess={handleTransactionSuccess}
       />
+
+      {/* No Cards Message */}
+      {showNoCardsMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-amber-700/30 rounded-lg p-8 max-w-md mx-4 text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-amber-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus className="h-8 w-8 text-amber-400" />
+              </div>
+              <h3 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">No Cards Found</h3>
+              <p className="text-slate-400 text-sm">
+                You need to add a payment card before creating transactions.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-amber-400">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-amber-400 border-t-transparent"></div>
+              <span className="text-sm tracking-wider">Redirecting to Cards page...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-5xl font-serif text-slate-100 mb-2 tracking-wide">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 tracking-wide">
               D A S H B O A R D
             </h1>
             <p className="text-slate-400 text-sm tracking-widest uppercase">Financial Overview</p>
           </div>
           <button
-            onClick={() => setShowTransactionModal(true)}
+            onClick={handleAddTransactionClick}
             className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
           >
             <Plus className="h-5 w-5" />
