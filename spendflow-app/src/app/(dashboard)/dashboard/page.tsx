@@ -98,7 +98,7 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchData();
-    setTimeout(() => setIsRefreshing(false), 500);
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   useEffect(() => {
