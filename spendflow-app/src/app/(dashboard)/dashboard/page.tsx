@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { TrendingUp, Award, Plus, RefreshCw } from 'lucide-react';
+import { TrendingUp, Award, Plus } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
@@ -34,7 +34,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const hasCards = cards.length > 0;
   const [stats, setStats] = useState({
     totalBalance: 0,
@@ -93,12 +92,6 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchData();
-    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   useEffect(() => {
@@ -166,24 +159,14 @@ export default function Dashboard() {
             </h1>
             <p className="text-slate-400 text-sm tracking-widest uppercase">Financial Overview</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-3 border border-slate-700 text-slate-400 hover:border-amber-600 hover:text-amber-400 transition-colors disabled:opacity-50"
-              title="Refresh data"
-            >
-              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={handleAddTransactionClick}
-              className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
-            >
-              <Plus className="h-5 w-5" />
-              <span className="hidden sm:inline">Add Transaction</span>
-              <span className="sm:hidden">Add</span>
-            </button>
-          </div>
+          <button
+            onClick={handleAddTransactionClick}
+            className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="hidden sm:inline">Add Transaction</span>
+            <span className="sm:hidden">Add</span>
+          </button>
         </div>
 
         {/* Main Balance Card */}
