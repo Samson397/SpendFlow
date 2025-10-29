@@ -16,9 +16,10 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  // Don't show loading screen to prevent blinking during redirect
-  if (loading || user) {
-    return null;
+  // Only hide page if user is logged in and redirecting
+  // Show landing page while checking auth status
+  if (!loading && user) {
+    return null; // Redirect happening, don't show anything
   }
 
   return (
