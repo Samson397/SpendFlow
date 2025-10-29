@@ -59,7 +59,7 @@ export default function Signup() {
         currency: 'USD', // Default currency
       });
       
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (error: unknown) {
       const firebaseError = error as SignupError;
       let errorMessage = 'Failed to create an account';
@@ -98,7 +98,7 @@ export default function Signup() {
         currency: 'USD', // Default currency
       }, { merge: true });
       
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (error: unknown) {
       const firebaseError = error as SignupError;
       setError(firebaseError.message || 'Failed to sign up with Google');
