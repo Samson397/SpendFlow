@@ -16,12 +16,9 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-        <div className="text-amber-400 text-lg font-serif tracking-wider">Loading...</div>
-      </div>
-    );
+  // Don't show loading screen to prevent blinking during redirect
+  if (loading || user) {
+    return null;
   }
 
   return (
