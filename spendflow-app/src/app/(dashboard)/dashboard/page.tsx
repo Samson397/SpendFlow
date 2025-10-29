@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { TrendingUp, Award, Plus } from 'lucide-react';
+import { TrendingUp, Award, Plus, RefreshCw } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
@@ -34,6 +34,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullStartY, setPullStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
   const hasCards = cards.length > 0;
   const [stats, setStats] = useState({
     totalBalance: 0,
@@ -94,9 +97,54 @@ export default function Dashboard() {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchData();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
+
   useEffect(() => {
     fetchData();
   }, [user]);
+
+  // Pull-to-refresh for mobile
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (window.scrollY === 0) {
+        setPullStartY(e.touches[0].clientY);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (pullStartY === 0) return;
+      const currentY = e.touches[0].clientY;
+      const distance = currentY - pullStartY;
+      if (distance > 0 && window.scrollY === 0) {
+        setPullDistance(Math.min(distance, 100));
+      }
+    };
+
+    const handleTouchEnd = async () => {
+      if (pullDistance > 60) {
+        setIsRefreshing(true);
+        await fetchData();
+        setTimeout(() => setIsRefreshing(false), 500);
+      }
+      setPullStartY(0);
+      setPullDistance(0);
+    };
+
+    document.addEventListener('touchstart', handleTouchStart);
+    document.addEventListener('touchmove', handleTouchMove);
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pullStartY, pullDistance]);
 
   if (loading) {
     return (
@@ -122,7 +170,21 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-12 relative">
+      {/* Pull to Refresh Indicator */}
+      {pullDistance > 0 && (
+        <div 
+          className="fixed top-0 left-0 right-0 flex justify-center z-50 transition-all"
+          style={{ transform: `translateY(${pullDistance - 60}px)` }}
+        >
+          <div className="bg-slate-900/90 backdrop-blur-sm border border-amber-600/30 rounded-full px-4 py-2 flex items-center gap-2">
+            <RefreshCw className={`h-4 w-4 text-amber-400 ${pullDistance > 60 ? 'animate-spin' : ''}`} />
+            <span className="text-amber-400 text-sm font-serif">
+              {pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}
+            </span>
+          </div>
+        </div>
+      )}
       {/* Add Transaction Modal */}
       <AddTransactionModal
         isOpen={showTransactionModal}
@@ -159,13 +221,24 @@ export default function Dashboard() {
             </h1>
             <p className="text-slate-400 text-sm tracking-widest uppercase">Financial Overview</p>
           </div>
-          <button
-            onClick={handleAddTransactionClick}
-            className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
-          >
-            <Plus className="h-5 w-5" />
-            Add Transaction
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-3 border border-slate-700 text-slate-400 hover:border-amber-600 hover:text-amber-400 transition-colors disabled:opacity-50"
+              title="Refresh data"
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={handleAddTransactionClick}
+              className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="hidden sm:inline">Add Transaction</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
 
         {/* Main Balance Card */}
