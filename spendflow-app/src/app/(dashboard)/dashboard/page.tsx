@@ -35,8 +35,6 @@ export default function Dashboard() {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullStartY, setPullStartY] = useState(0);
-  const [pullDistance, setPullDistance] = useState(0);
   const hasCards = cards.length > 0;
   const [stats, setStats] = useState({
     totalBalance: 0,
@@ -107,45 +105,6 @@ export default function Dashboard() {
     fetchData();
   }, [user]);
 
-  // Pull-to-refresh for mobile
-  useEffect(() => {
-    const handleTouchStart = (e: TouchEvent) => {
-      if (window.scrollY === 0) {
-        setPullStartY(e.touches[0].clientY);
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (pullStartY === 0) return;
-      const currentY = e.touches[0].clientY;
-      const distance = currentY - pullStartY;
-      if (distance > 0 && window.scrollY === 0) {
-        setPullDistance(Math.min(distance, 100));
-      }
-    };
-
-    const handleTouchEnd = async () => {
-      if (pullDistance > 60) {
-        setIsRefreshing(true);
-        await fetchData();
-        setTimeout(() => setIsRefreshing(false), 500);
-      }
-      setPullStartY(0);
-      setPullDistance(0);
-    };
-
-    document.addEventListener('touchstart', handleTouchStart);
-    document.addEventListener('touchmove', handleTouchMove);
-    document.addEventListener('touchend', handleTouchEnd);
-
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pullStartY, pullDistance]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -170,24 +129,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-12 relative">
-      {/* Pull to Refresh Indicator */}
-      {pullDistance > 20 && (
-        <div 
-          className="fixed top-0 left-0 right-0 flex justify-center z-50 transition-opacity duration-200"
-          style={{ 
-            transform: `translateY(${Math.max(pullDistance - 60, -40)}px)`,
-            opacity: pullDistance > 20 ? 1 : 0
-          }}
-        >
-          <div className="bg-slate-900/90 backdrop-blur-sm border border-amber-600/30 rounded-full px-4 py-2 flex items-center gap-2 shadow-lg">
-            <RefreshCw className={`h-4 w-4 text-amber-400 transition-transform ${pullDistance > 60 ? 'animate-spin' : ''}`} />
-            <span className="text-amber-400 text-sm font-serif">
-              {pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}
-            </span>
-          </div>
-        </div>
-      )}
+    <div className="space-y-12">
       {/* Add Transaction Modal */}
       <AddTransactionModal
         isOpen={showTransactionModal}
