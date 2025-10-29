@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Camera } from 'lucide-react';
 import { transactionsService, cardsService } from '@/lib/firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { ScanReceiptModal } from './ScanReceiptModal';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
   const { user } = useAuth();
   const { currency } = useCurrency();
   const [loading, setLoading] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [cards, setCards] = useState<Array<{ id: string; name?: string; type: string; lastFour?: string; balance: number }>>([]);
   const [formData, setFormData] = useState({
     type: defaultType,
@@ -31,6 +33,17 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
     cardId: '',
     date: new Date().toISOString().split('T')[0],
   });
+
+  const handleScanData = (data: { amount: number; merchant: string; date?: string; category?: string }) => {
+    setFormData(prev => ({
+      ...prev,
+      amount: data.amount.toString(),
+      description: data.merchant,
+      category: data.category || 'Other',
+      date: data.date || prev.date,
+    }));
+    setShowScanModal(false);
+  };
 
   useEffect(() => {
     if (isOpen && user) {
@@ -75,11 +88,28 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
       // Update card balance
       const card = cards.find(c => c.id === formData.cardId);
       if (card) {
-        const newBalance = formData.type === 'income' 
-          ? card.balance + parseFloat(formData.amount)
-          : card.balance - parseFloat(formData.amount);
-        
-        await cardsService.update(formData.cardId, { balance: newBalance });
+        // DEBIT CARD: Update balance immediately
+        if (card.type === 'debit') {
+          const newBalance = formData.type === 'income' 
+            ? card.balance + parseFloat(formData.amount)  // Income adds money
+            : card.balance - parseFloat(formData.amount); // Expense removes money
+          
+          await cardsService.update(formData.cardId, { balance: newBalance });
+        } 
+        // CREDIT CARD: Decrease available balance to show real-time usage
+        else if (card.type === 'credit') {
+          if (formData.type === 'expense') {
+            // Expense decreases available credit (shows how much you've spent)
+            const newBalance = card.balance - parseFloat(formData.amount);
+            await cardsService.update(formData.cardId, { balance: newBalance });
+          } else if (formData.type === 'income') {
+            // Payment increases available credit
+            const newBalance = card.balance + parseFloat(formData.amount);
+            await cardsService.update(formData.cardId, { balance: newBalance });
+          }
+          // On payment due date, the accumulated expenses will be paid from linked debit card
+          // and the available balance will be restored
+        }
       }
       
       onSuccess();
@@ -103,30 +133,49 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-slate-950 border border-amber-700/30 rounded-lg max-w-md w-full shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            {formData.type === 'income' ? (
-              <TrendingUp className="h-6 w-6 text-green-400" />
-            ) : (
-              <TrendingDown className="h-6 w-6 text-amber-400" />
-            )}
-            <h2 className="text-2xl font-serif text-slate-100 tracking-wide">
-              Add {formData.type === 'income' ? 'Income' : 'Expense'}
-            </h2>
+    <>
+      <ScanReceiptModal
+        isOpen={showScanModal}
+        onClose={() => setShowScanModal(false)}
+        onDataExtracted={handleScanData}
+      />
+      
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div className="bg-slate-950 border border-amber-700/30 rounded-lg max-w-sm w-full shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              {formData.type === 'income' ? (
+                <TrendingUp className="h-6 w-6 text-green-400" />
+              ) : (
+                <TrendingDown className="h-6 w-6 text-amber-400" />
+              )}
+              <h2 className="text-2xl font-serif text-slate-100 tracking-wide">
+                Add {formData.type === 'income' ? 'Income' : 'Expense'}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.type === 'expense' && (
+                <button
+                  type="button"
+                  onClick={() => setShowScanModal(true)}
+                  className="p-2 text-slate-400 hover:text-amber-400 transition-colors"
+                  title="Scan Receipt"
+                >
+                  <Camera className="h-5 w-5" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Type Toggle */}
           <div>
             <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
@@ -267,5 +316,6 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
         </form>
       </div>
     </div>
+    </>
   );
 }

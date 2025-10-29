@@ -3,31 +3,41 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import { transactionsService } from '@/lib/firebase/firestore';
-import { Transaction } from '@/types';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, CreditCard } from 'lucide-react';
+import { cardsService } from '@/lib/firebase/firestore';
+import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
+import { RecurringExpense } from '@/types/recurring';
+import { Card } from '@/types';
 
 export default function CalendarPage() {
   const { user } = useAuth();
   const { formatAmount } = useCurrency();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [recurringTransactions, setRecurringTransactions] = useState<Transaction[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [creditCards, setCreditCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
-    loadRecurringTransactions();
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const loadRecurringTransactions = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const allTransactions = await transactionsService.getByUserId(user!.uid);
-      // Filter only recurring transactions
-      const recurring = allTransactions.filter(t => t.isRecurring);
-      setRecurringTransactions(recurring);
+      // Load recurring expenses
+      const expenses = await recurringExpensesService.getByUserId(user!.uid);
+      setRecurringExpenses(expenses.filter(e => e.isActive));
+      
+      // Load credit cards with payment due dates
+      const cards = await cardsService.getByUserId(user!.uid);
+      const creditCardsWithDueDate = cards.filter(c => 
+        c.type === 'credit' && c.isActive && c.paymentDueDay
+      );
+      setCreditCards(creditCardsWithDueDate);
     } catch (error) {
-      console.error('Error loading recurring transactions:', error);
+      console.error('Error loading calendar data:', error);
     } finally {
       setLoading(false);
     }
@@ -44,11 +54,12 @@ export default function CalendarPage() {
     return { daysInMonth, startingDayOfWeek, year, month };
   };
 
-  const getRecurringPaymentsForDay = (day: number) => {
-    return recurringTransactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
-      return transactionDate.getDate() === day;
-    });
+  const getRecurringExpensesForDay = (day: number) => {
+    return recurringExpenses.filter(expense => expense.dayOfMonth === day);
+  };
+
+  const getCreditCardPaymentsForDay = (day: number) => {
+    return creditCards.filter(card => card.paymentDueDay === day);
   };
 
   const previousMonth = () => {
@@ -103,7 +114,7 @@ export default function CalendarPage() {
             {monthNames[month]} {year}
           </div>
           <div className="text-slate-500 text-sm tracking-wider mt-2">
-            {recurringTransactions.length} Recurring Payment{recurringTransactions.length !== 1 ? 's' : ''}
+            {recurringExpenses.length} Recurring Expense{recurringExpenses.length !== 1 ? 's' : ''} • {creditCards.length} Credit Card{creditCards.length !== 1 ? 's' : ''}
           </div>
         </div>
 
@@ -139,8 +150,10 @@ export default function CalendarPage() {
           {/* Days of the month */}
           {Array.from({ length: daysInMonth }).map((_, index) => {
             const day = index + 1;
-            const paymentsForDay = getRecurringPaymentsForDay(day);
+            const expensesForDay = getRecurringExpensesForDay(day);
+            const creditCardPayments = getCreditCardPaymentsForDay(day);
             const isToday = isCurrentMonth && day === currentDay;
+            const hasItems = expensesForDay.length > 0 || creditCardPayments.length > 0;
 
             return (
               <div
@@ -157,48 +170,74 @@ export default function CalendarPage() {
                   {day}
                 </div>
 
-                {paymentsForDay.length > 0 && (
+                {hasItems && (
                   <div className="space-y-1">
-                    {paymentsForDay.slice(0, 2).map((payment, idx) => (
+                    {/* Recurring Expenses */}
+                    {expensesForDay.slice(0, 1).map((expense, idx) => (
                       <div
-                        key={idx}
-                        className={`text-xs px-2 py-1 border-l-2 ${
-                          payment.type === 'expense' 
-                            ? 'border-red-500 bg-red-900/20 text-red-300' 
-                            : 'border-green-500 bg-green-900/20 text-green-300'
-                        } truncate`}
-                        title={`${payment.description} - ${formatAmount(payment.amount)}`}
+                        key={`expense-${idx}`}
+                        className="text-xs px-2 py-1 border-l-2 border-red-500 bg-red-900/20 text-red-300 truncate"
+                        title={`${expense.name} - ${formatAmount(expense.amount)}`}
                       >
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          <span className="truncate">{payment.description}</span>
+                          <span className="truncate">{expense.name}</span>
                         </div>
                       </div>
                     ))}
-                    {paymentsForDay.length > 2 && (
+                    
+                    {/* Credit Card Payments */}
+                    {creditCardPayments.slice(0, 1).map((card, idx) => (
+                      <div
+                        key={`card-${idx}`}
+                        className="text-xs px-2 py-1 border-l-2 border-blue-500 bg-blue-900/20 text-blue-300 truncate"
+                        title={`${card.name} Payment Due`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <CreditCard className="h-3 w-3" />
+                          <span className="truncate">{card.name} Payment</span>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {(expensesForDay.length + creditCardPayments.length) > 2 && (
                       <div className="text-xs text-slate-500 text-center">
-                        +{paymentsForDay.length - 2} more
+                        +{(expensesForDay.length + creditCardPayments.length) - 2} more
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Hover tooltip */}
-                {paymentsForDay.length > 0 && (
+                {hasItems && (
                   <div className="absolute left-0 top-full mt-2 w-64 bg-slate-800 border border-slate-700 p-4 opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
                     <div className="text-xs text-amber-400 mb-2 font-serif tracking-wider">
                       {monthNames[month]} {day}, {year}
                     </div>
                     <div className="space-y-2">
-                      {paymentsForDay.map((payment, idx) => (
-                        <div key={idx} className="text-xs">
+                      {/* Recurring Expenses */}
+                      {expensesForDay.map((expense, idx) => (
+                        <div key={`exp-${idx}`} className="text-xs">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-slate-300">{payment.description}</span>
-                            <span className={payment.type === 'expense' ? 'text-red-400' : 'text-green-400'}>
-                              {formatAmount(payment.amount)}
+                            <span className="text-slate-300">{expense.name}</span>
+                            <span className="text-red-400">
+                              {formatAmount(expense.amount)}
                             </span>
                           </div>
-                          <div className="text-slate-500">{payment.category}</div>
+                          <div className="text-slate-500">{expense.category}</div>
+                        </div>
+                      ))}
+                      
+                      {/* Credit Card Payments */}
+                      {creditCardPayments.map((card, idx) => (
+                        <div key={`crd-${idx}`} className="text-xs">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-300">{card.name} Payment</span>
+                            <span className="text-blue-400">
+                              Due
+                            </span>
+                          </div>
+                          <div className="text-slate-500">Credit Card Bill</div>
                         </div>
                       ))}
                     </div>
@@ -219,31 +258,25 @@ export default function CalendarPage() {
             </div>
             <div className="text-4xl font-serif text-slate-100 mb-2">
               {formatAmount(
-                recurringTransactions
-                  .filter(t => t.type === 'expense')
-                  .reduce((sum, t) => sum + t.amount, 0)
+                recurringExpenses.reduce((sum, expense) => sum + expense.amount, 0)
               )}
             </div>
             <div className="text-slate-500 text-sm">
-              {recurringTransactions.filter(t => t.type === 'expense').length} payment{recurringTransactions.filter(t => t.type === 'expense').length !== 1 ? 's' : ''}
+              {recurringExpenses.length} recurring expense{recurringExpenses.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
 
         <div className="bg-slate-900/50 border border-slate-800 p-8 backdrop-blur-sm">
-          <div className="border-l-2 border-green-600 pl-6">
+          <div className="border-l-2 border-blue-600 pl-6">
             <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 font-serif">
-              Monthly Recurring Income
+              Credit Card Payments
             </div>
             <div className="text-4xl font-serif text-slate-100 mb-2">
-              {formatAmount(
-                recurringTransactions
-                  .filter(t => t.type === 'income')
-                  .reduce((sum, t) => sum + t.amount, 0)
-              )}
+              {creditCards.length}
             </div>
             <div className="text-slate-500 text-sm">
-              {recurringTransactions.filter(t => t.type === 'income').length} payment{recurringTransactions.filter(t => t.type === 'income').length !== 1 ? 's' : ''}
+              Credit card{creditCards.length !== 1 ? 's' : ''} with payment due
             </div>
           </div>
         </div>

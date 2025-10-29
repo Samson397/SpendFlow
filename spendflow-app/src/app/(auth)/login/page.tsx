@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '@/firebase/config';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 export default function Login() {
@@ -12,6 +13,14 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,8 +30,9 @@ export default function Login() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.replace('/dashboard');
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in');
+    } catch (error: unknown) {
+      const authError = error as { message?: string };
+      setError(authError.message || 'Failed to sign in');
     } finally {
       setLoading(false);
     }
@@ -36,8 +46,9 @@ export default function Login() {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.replace('/dashboard');
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in with Google');
+    } catch (error: unknown) {
+      const authError = error as { message?: string };
+      setError(authError.message || 'Failed to sign in with Google');
     } finally {
       setLoading(false);
     }

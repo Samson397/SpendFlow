@@ -8,6 +8,7 @@ import { TrendingUp, Award, Plus } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
+import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
 
 type Transaction = {
   id: string;
@@ -20,9 +21,11 @@ type Transaction = {
 
 type CardType = {
   id: string;
-  name: string;
-  balance: number;
+  name?: string;
   type: 'credit' | 'debit';
+  balance: number;
+  lastFour?: string;
+  cardHolder?: string;
 };
 
 export default function Dashboard() {
@@ -34,9 +37,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
+  const [showCardsModal, setShowCardsModal] = useState(false);
+  const [selectedCardType, setSelectedCardType] = useState<'credit' | 'debit'>('credit');
   const hasCards = cards.length > 0;
   const [stats, setStats] = useState({
     totalBalance: 0,
+    creditBalance: 0,
+    debitBalance: 0,
+    creditCardCount: 0,
+    debitCardCount: 0,
     income: 0,
     expenses: 0,
     savings: 0,
@@ -79,10 +88,22 @@ export default function Dashboard() {
       
       setCards(cardsData);
       
-      const totalBalance = cardsData.reduce((sum, card) => sum + card.balance, 0);
+      // Calculate card balances
+      const creditCards = cardsData.filter(card => card.type === 'credit');
+      const debitCards = cardsData.filter(card => card.type === 'debit');
+      
+      const creditBalance = creditCards.reduce((sum, card) => sum + card.balance, 0);
+      const debitBalance = debitCards.reduce((sum, card) => sum + card.balance, 0);
+      
+      // Total balance = all available money (both debit and credit available)
+      const totalBalance = debitBalance + creditBalance;
       
       setStats({
         totalBalance,
+        creditBalance,
+        debitBalance,
+        creditCardCount: creditCards.length,
+        debitCardCount: debitCards.length,
         income,
         expenses,
         savings: income - expenses,
@@ -128,6 +149,14 @@ export default function Dashboard() {
         isOpen={showTransactionModal}
         onClose={() => setShowTransactionModal(false)}
         onSuccess={handleTransactionSuccess}
+      />
+
+      {/* Cards Breakdown Modal */}
+      <CardsBreakdownModal
+        isOpen={showCardsModal}
+        onClose={() => setShowCardsModal(false)}
+        cards={cards}
+        type={selectedCardType}
       />
 
       {/* No Cards Message */}
@@ -183,13 +212,44 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Card Balance Grid */}
+        <div className="grid grid-cols-2 gap-8 mb-12">
+          <button
+            onClick={() => {
+              setSelectedCardType('credit');
+              setShowCardsModal(true);
+            }}
+            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-blue-600/50 transition-colors text-left"
+          >
+            <div className="border-l-2 border-amber-600 pl-6">
+              <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Credit Cards</div>
+              <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.creditBalance)}</div>
+              <div className="text-slate-600 text-sm">{stats.creditCardCount} {stats.creditCardCount === 1 ? 'Card' : 'Cards'}</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setSelectedCardType('debit');
+              setShowCardsModal(true);
+            }}
+            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
+          >
+            <div className="border-l-2 border-amber-600 pl-6">
+              <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Debit Cards</div>
+              <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.debitBalance)}</div>
+              <div className="text-slate-600 text-sm">{stats.debitCardCount} {stats.debitCardCount === 1 ? 'Card' : 'Cards'}</div>
+            </div>
+          </button>
+        </div>
+
+        {/* Income/Expenses Stats */}
         <div className="grid grid-cols-2 gap-8 mb-12">
           <button
             onClick={() => router.push('/income')}
             className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-amber-600 pl-6">
+            <div className="border-l-2 border-green-600 pl-6">
               <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Income</div>
               <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.income)}</div>
               <div className="text-slate-600 text-sm">Total Revenue</div>
@@ -198,9 +258,9 @@ export default function Dashboard() {
 
           <button
             onClick={() => router.push('/expenses')}
-            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-amber-600/50 transition-colors text-left"
+            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-red-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-amber-600 pl-6">
+            <div className="border-l-2 border-red-600 pl-6">
               <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Expenses</div>
               <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.expenses)}</div>
               <div className="text-slate-600 text-sm">Total Expenditure</div>

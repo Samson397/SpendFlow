@@ -1,8 +1,14 @@
+'use client';
+
 import { ReactNode } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Sidebar from '@/components/layout/Sidebar';
+import { useRecurringExpenseProcessor } from '@/hooks/useRecurringExpenseProcessor';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  // Automatically process recurring expenses once per day when user logs in
+  useRecurringExpenseProcessor();
+
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen bg-slate-900">

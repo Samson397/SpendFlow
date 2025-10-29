@@ -50,13 +50,55 @@ export const creditCardPaymentService = {
 
   /**
    * Process payment for a single credit card
+   * Calculates total expenses from last statement to now and deducts from debit card
    */
   async processPayment(creditCard: Card): Promise<void> {
     try {
-      const paymentAmount = creditCard.balance; // Full balance payment
       const debitCardId = creditCard.paymentDebitCardId;
 
-      if (!debitCardId || paymentAmount <= 0) {
+      if (!debitCardId) {
+        console.log(`No debit card linked for card ${creditCard.id}`);
+        return;
+      }
+
+      // Calculate billing cycle
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const statementDay = creditCard.statementDay || 1;
+      
+      // Last statement date (start of billing cycle)
+      const lastStatementDate = new Date(currentYear, currentMonth - 1, statementDay);
+      // Current statement date (end of billing cycle)
+      const currentStatementDate = new Date(currentYear, currentMonth, statementDay);
+
+      // Get all expenses on this credit card during billing cycle
+      const transactionsQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', creditCard.userId),
+        where('cardId', '==', creditCard.id),
+        where('type', '==', 'expense')
+      );
+
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      const allTransactions = transactionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Filter transactions within billing cycle
+      const billingCycleTransactions = allTransactions.filter(transaction => {
+        const transactionDate = transaction.date instanceof Date 
+          ? transaction.date 
+          : new Date((transaction.date as any).toDate());
+        
+        return transactionDate >= lastStatementDate && transactionDate < currentStatementDate;
+      });
+
+      // Calculate total amount due
+      const paymentAmount = billingCycleTransactions.reduce((sum, t: any) => sum + t.amount, 0);
+
+      if (paymentAmount <= 0) {
         console.log(`No payment needed for card ${creditCard.id}`);
         return;
       }
@@ -93,9 +135,9 @@ export const creditCardPaymentService = {
         updatedAt: new Date(),
       });
 
-      // 2. Pay off credit card (reduce balance to 0)
+      // 2. Increase credit card available balance (payment clears the debt)
       await updateDoc(doc(db, 'cards', creditCard.id), {
-        balance: 0,
+        balance: creditCard.balance + paymentAmount,
         updatedAt: new Date(),
       });
 

@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
-  // No auto-redirect - users can browse landing page freely
+  const { user, loading } = useAuth();
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -18,18 +19,29 @@ export default function Home() {
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              <Link
-                href="/login"
-                className="text-slate-400 hover:text-amber-400 font-serif tracking-wide transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
-                className="px-6 py-2.5 border border-amber-600 text-amber-400 bg-amber-900/10 hover:bg-amber-600/20 font-serif tracking-wider transition-all"
-              >
-                Get Started
-              </Link>
+              {!loading && user ? (
+                <Link
+                  href="/dashboard"
+                  className="px-6 py-2.5 border border-amber-600 text-amber-400 bg-amber-900/10 hover:bg-amber-600/20 font-serif tracking-wider transition-all"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="text-slate-400 hover:text-amber-400 font-serif tracking-wide transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="px-6 py-2.5 border border-amber-600 text-amber-400 bg-amber-900/10 hover:bg-amber-600/20 font-serif tracking-wider transition-all"
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -50,24 +62,9 @@ export default function Home() {
             {/* Decorative Line */}
             <div className="w-32 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
             
-            <p className="text-xl text-slate-400 mb-12 max-w-2xl mx-auto tracking-wide leading-relaxed">
+            <p className="text-xl text-slate-400 mb-20 max-w-2xl mx-auto tracking-wide leading-relaxed">
               Experience premium financial management. Track expenses, manage cards, monitor income, and gain insights into your spending habits—all in one sophisticated platform.
             </p>
-
-            <div className="flex flex-col sm:flex-row gap-6 justify-center mb-20">
-              <Link
-                href="/signup"
-                className="px-10 py-4 border border-amber-600 text-amber-400 bg-amber-900/10 hover:bg-amber-600/20 text-lg font-serif tracking-widest uppercase transition-all"
-              >
-                Begin Your Journey
-              </Link>
-              <Link
-                href="/login"
-                className="px-10 py-4 border border-slate-700 text-slate-300 bg-slate-800/50 hover:bg-slate-800 hover:border-amber-600/50 text-lg font-serif tracking-widest uppercase transition-all"
-              >
-                Sign In
-              </Link>
-            </div>
 
             {/* Features Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-20">

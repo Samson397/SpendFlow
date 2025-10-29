@@ -4,16 +4,17 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { TrendingDown, Plus, CreditCard } from 'lucide-react';
-import { transactionsService, cardsService } from '@/lib/firebase/firestore';
-import { Transaction } from '@/types';
-import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
+import { TrendingDown, Plus, CreditCard, Calendar } from 'lucide-react';
+import { cardsService } from '@/lib/firebase/firestore';
+import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
+import { RecurringExpense } from '@/types/recurring';
+import { AddRecurringExpenseModal } from '@/components/recurring/AddRecurringExpenseModal';
 
 export default function ExpensesPage() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
-  const [expenses, setExpenses] = useState<Transaction[]>([]);
+  const [expenses, setExpenses] = useState<RecurringExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [hasCards, setHasCards] = useState(false);
@@ -29,8 +30,8 @@ export default function ExpensesPage() {
   const loadExpenses = async () => {
     try {
       setLoading(true);
-      const transactions = await transactionsService.getRecentByUserId(user!.uid, 100);
-      setExpenses(transactions.filter(t => t.type === 'expense'));
+      const recurringExpenses = await recurringExpensesService.getByUserId(user!.uid);
+      setExpenses(recurringExpenses);
     } catch (error) {
       console.error('Error loading expenses:', error);
     } finally {
@@ -74,11 +75,10 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-12">
-      <AddTransactionModal 
+      <AddRecurringExpenseModal 
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onSuccess={handleSuccess}
-        defaultType="expense"
       />
 
       {/* No Cards Message */}
@@ -130,7 +130,7 @@ export default function ExpensesPage() {
           <div className="text-6xl font-serif text-slate-100 mb-2">{formatAmount(totalExpenses)}</div>
           <div className="flex items-center justify-center gap-2 text-slate-500">
             <TrendingDown className="h-4 w-4" />
-            <span className="text-sm tracking-wider">{expenses.length} Transactions</span>
+            <span className="text-sm tracking-wider">{expenses.length} Recurring Expenses</span>
           </div>
         </div>
       </div>
@@ -139,7 +139,7 @@ export default function ExpensesPage() {
       <div>
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-0.5 bg-gradient-to-r from-amber-600 to-transparent"></div>
-          <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Recent Expenses</h2>
+          <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Monthly Recurring Expenses</h2>
         </div>
 
         {expenses.length > 0 ? (
@@ -151,10 +151,23 @@ export default function ExpensesPage() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-6">
-                    <div className="w-1 h-12 bg-amber-600"></div>
+                    <div className={`w-1 h-12 ${expense.isActive ? 'bg-amber-600' : 'bg-slate-600'}`}></div>
                     <div>
-                      <div className="text-slate-200 font-serif mb-1">{expense.description}</div>
-                      <div className="text-xs text-slate-600 tracking-wider uppercase">{expense.category}</div>
+                      <div className="text-slate-200 font-serif mb-1">{expense.name}</div>
+                      <div className="flex items-center gap-4 text-xs text-slate-600 tracking-wider">
+                        <span className="uppercase">{expense.category}</span>
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>Day {expense.dayOfMonth} of month</span>
+                        </div>
+                        {!expense.isActive && (
+                          <>
+                            <span>•</span>
+                            <span className="text-red-400">INACTIVE</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="text-xl font-serif text-slate-300">
@@ -166,8 +179,8 @@ export default function ExpensesPage() {
           </div>
         ) : (
           <div className="text-center py-16 border border-slate-800 bg-slate-900/30">
-            <div className="text-slate-500 mb-4 text-lg font-serif">No expenses recorded</div>
-            <p className="text-slate-600 text-sm tracking-wide">Your expense tracking will appear here</p>
+            <div className="text-slate-500 mb-4 text-lg font-serif">No recurring expenses</div>
+            <p className="text-slate-600 text-sm tracking-wide">Add monthly subscriptions like Netflix, Spotify, etc.</p>
           </div>
         )}
       </div>

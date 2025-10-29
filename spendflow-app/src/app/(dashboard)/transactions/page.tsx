@@ -9,6 +9,7 @@ import { transactionsService, cardsService } from '@/lib/firebase/firestore';
 import { Transaction } from '@/types';
 import { format } from 'date-fns';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
+import { EditTransactionModal } from '@/components/transactions/EditTransactionModal';
 
 export default function TransactionsPage() {
   const { user } = useAuth();
@@ -18,8 +19,15 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [hasCards, setHasCards] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
+
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowEditModal(true);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -94,6 +102,17 @@ export default function TransactionsPage() {
         onSuccess={handleSuccess}
       />
 
+      {/* Edit Transaction Modal */}
+      <EditTransactionModal
+        isOpen={showEditModal}
+        transaction={selectedTransaction}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedTransaction(null);
+        }}
+        onSuccess={handleSuccess}
+      />
+
       {/* No Cards Message */}
       {showNoCardsMessage && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -153,32 +172,28 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center justify-between border-t border-b border-slate-800 py-6">
-        <div className="flex items-center gap-4">
-          <span className="text-slate-500 text-xs tracking-widest uppercase font-serif">Filter:</span>
-          <div className="flex gap-2">
-            {['all', 'income', 'expense'].map((type) => (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`px-6 py-2 text-xs tracking-wider uppercase transition-colors ${
-                  filterType === type
-                    ? 'border border-amber-600 text-amber-400 bg-amber-900/10'
-                    : 'border border-slate-700 text-slate-400 hover:border-amber-600/50 hover:text-slate-200'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
+      <div className="flex items-center justify-between border-t border-b border-slate-800 py-4">
+        <div className="flex items-center gap-3">
+          <label htmlFor="filter-select" className="text-slate-500 text-xs tracking-widest uppercase font-serif">Filter:</label>
+          <select
+            id="filter-select"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="px-4 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors text-xs tracking-wider uppercase"
+          >
+            <option value="all">All Transactions</option>
+            <option value="income">Income Only</option>
+            <option value="expense">Expenses Only</option>
+          </select>
         </div>
 
         <button 
           onClick={handleAddTransactionClick}
-          className="inline-flex items-center gap-3 px-6 py-2 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-xs"
+          className="inline-flex items-center gap-2 px-4 py-1.5 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-xs"
         >
           <Plus className="h-4 w-4" />
-          Add Transaction
+          <span className="hidden sm:inline">Add Transaction</span>
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
@@ -193,9 +208,10 @@ export default function TransactionsPage() {
         {filteredTransactions.length > 0 ? (
           <div className="space-y-1">
             {filteredTransactions.map((transaction) => (
-              <div
+              <button
                 key={transaction.id}
-                className="border-b border-slate-800 py-6 hover:bg-slate-900/30 transition-colors"
+                onClick={() => handleTransactionClick(transaction)}
+                className="w-full border-b border-slate-800 py-6 hover:bg-slate-900/30 transition-colors text-left"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-6">
@@ -215,7 +231,7 @@ export default function TransactionsPage() {
                     {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         ) : (

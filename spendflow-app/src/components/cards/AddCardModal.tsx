@@ -48,6 +48,12 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         type: formData.type,
         color: formData.color,
         isActive: true,
+        // Credit card specific fields
+        ...(formData.type === 'credit' && {
+          statementDay: parseInt(formData.statementDay),
+          paymentDueDay: parseInt(formData.paymentDueDay),
+          creditLimit: parseFloat(formData.creditLimit) || parseFloat(formData.balance) || 0,
+        }),
       });
       
       onSuccess();
@@ -74,9 +80,9 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-slate-950 border border-amber-700/30 rounded-lg max-w-md w-full shadow-2xl">
+      <div className="bg-slate-950 border border-amber-700/30 rounded-lg max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <CreditCard className="h-6 w-6 text-amber-400" />
             <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Add New Card</h2>
@@ -90,7 +96,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Card Name */}
           <div>
             <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
