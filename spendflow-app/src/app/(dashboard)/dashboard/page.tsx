@@ -14,7 +14,7 @@ type Transaction = {
   amount: number;
   type: 'income' | 'expense';
   category: string;
-  date: any;
+  date: Date | { toDate: () => Date };
   description: string;
 };
 
@@ -172,13 +172,16 @@ export default function Dashboard() {
   return (
     <div className="space-y-12 relative">
       {/* Pull to Refresh Indicator */}
-      {pullDistance > 0 && (
+      {pullDistance > 20 && (
         <div 
-          className="fixed top-0 left-0 right-0 flex justify-center z-50 transition-all"
-          style={{ transform: `translateY(${pullDistance - 60}px)` }}
+          className="fixed top-0 left-0 right-0 flex justify-center z-50 transition-opacity duration-200"
+          style={{ 
+            transform: `translateY(${Math.max(pullDistance - 60, -40)}px)`,
+            opacity: pullDistance > 20 ? 1 : 0
+          }}
         >
-          <div className="bg-slate-900/90 backdrop-blur-sm border border-amber-600/30 rounded-full px-4 py-2 flex items-center gap-2">
-            <RefreshCw className={`h-4 w-4 text-amber-400 ${pullDistance > 60 ? 'animate-spin' : ''}`} />
+          <div className="bg-slate-900/90 backdrop-blur-sm border border-amber-600/30 rounded-full px-4 py-2 flex items-center gap-2 shadow-lg">
+            <RefreshCw className={`h-4 w-4 text-amber-400 transition-transform ${pullDistance > 60 ? 'animate-spin' : ''}`} />
             <span className="text-amber-400 text-sm font-serif">
               {pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}
             </span>
@@ -363,7 +366,7 @@ export default function Dashboard() {
 
         {/* Quote */}
         <div className="text-center py-12 border-t border-slate-800">
-          <div className="text-amber-400/40 text-6xl mb-4">"</div>
+          <div className="text-amber-400/40 text-6xl mb-4">&ldquo;</div>
           <p className="text-slate-400 text-lg font-serif italic mb-4 max-w-2xl mx-auto">
             Wealth consists not in having great possessions, but in having few wants.
           </p>
