@@ -84,19 +84,19 @@ export const creditCardPaymentService = {
       const allTransactions = transactionsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Array<{ id: string; date: any; amount: number; [key: string]: any }>;
 
       // Filter transactions within billing cycle
       const billingCycleTransactions = allTransactions.filter(transaction => {
         const transactionDate = transaction.date instanceof Date 
           ? transaction.date 
-          : new Date((transaction.date as any).toDate());
+          : new Date(transaction.date.toDate());
         
         return transactionDate >= lastStatementDate && transactionDate < currentStatementDate;
       });
 
       // Calculate total amount due
-      const paymentAmount = billingCycleTransactions.reduce((sum, t: any) => sum + t.amount, 0);
+      const paymentAmount = billingCycleTransactions.reduce((sum, t) => sum + t.amount, 0);
 
       if (paymentAmount <= 0) {
         console.log(`No payment needed for card ${creditCard.id}`);
