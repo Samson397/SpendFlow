@@ -71,6 +71,23 @@ export function EditTransactionModal({ isOpen, transaction, onClose, onSuccess }
     e.preventDefault();
     if (!user || !transaction) return;
 
+    // Validation
+    const amount = parseFloat(formData.amount);
+    if (!formData.amount || isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount greater than 0');
+      return;
+    }
+    
+    if (!formData.description.trim()) {
+      alert('Please enter a description');
+      return;
+    }
+    
+    if (!formData.cardId) {
+      alert('Please select a card');
+      return;
+    }
+
     try {
       setLoading(true);
 

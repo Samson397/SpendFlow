@@ -10,8 +10,9 @@ import { Card as CardType } from '@/types';
 import { AddCardModal } from '@/components/cards/AddCardModal';
 import { EditCardModal } from '@/components/cards/EditCardModal';
 import toast from 'react-hot-toast';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function CardsPage() {
+function CardsPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
@@ -193,5 +194,13 @@ export default function CardsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CardsPage() {
+  return (
+    <AuthGate>
+      <CardsPageContent />
+    </AuthGate>
   );
 }

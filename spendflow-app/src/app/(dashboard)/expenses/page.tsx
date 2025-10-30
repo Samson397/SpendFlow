@@ -9,8 +9,9 @@ import { cardsService } from '@/lib/firebase/firestore';
 import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
 import { RecurringExpense } from '@/types/recurring';
 import { AddRecurringExpenseModal } from '@/components/recurring/AddRecurringExpenseModal';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function ExpensesPage() {
+function ExpensesPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
@@ -185,5 +186,13 @@ export default function ExpensesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ExpensesPage() {
+  return (
+    <AuthGate>
+      <ExpensesPageContent />
+    </AuthGate>
   );
 }

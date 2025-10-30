@@ -7,13 +7,14 @@ import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { AuthGate } from '@/components/auth/AuthGate';
 
 type SignupError = {
   code: string;
   message: string;
 };
 
-export default function Signup() {
+function SignupContent() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -296,5 +297,13 @@ export default function Signup() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Signup() {
+  return (
+    <AuthGate requireAuth={false}>
+      <SignupContent />
+    </AuthGate>
   );
 }

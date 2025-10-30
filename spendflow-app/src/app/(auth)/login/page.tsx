@@ -6,8 +6,9 @@ import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 
 import { auth } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function Login() {
+function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -201,5 +202,13 @@ export default function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <AuthGate requireAuth={false}>
+      <LoginContent />
+    </AuthGate>
   );
 }

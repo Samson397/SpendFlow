@@ -9,6 +9,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
+import { AuthGate } from '@/components/auth/AuthGate';
 
 type Transaction = {
   id: string;
@@ -28,7 +29,7 @@ type CardType = {
   cardHolder?: string;
 };
 
-export default function Dashboard() {
+function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
@@ -358,5 +359,13 @@ export default function Dashboard() {
           <div className="text-slate-600 text-sm tracking-widest">— EPICTETUS</div>
         </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <AuthGate>
+      <DashboardContent />
+    </AuthGate>
   );
 }

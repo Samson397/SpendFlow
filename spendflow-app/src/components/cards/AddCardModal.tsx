@@ -34,6 +34,37 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
     e.preventDefault();
     if (!user) return;
 
+    // Validation
+    if (!formData.name.trim()) {
+      alert('Please enter a card name');
+      return;
+    }
+
+    const balance = parseFloat(formData.balance);
+    if (isNaN(balance)) {
+      alert('Please enter a valid balance');
+      return;
+    }
+
+    if (formData.type === 'credit') {
+      const creditLimit = parseFloat(formData.creditLimit);
+      if (isNaN(creditLimit) || creditLimit <= 0) {
+        alert('Please enter a valid credit limit greater than 0');
+        return;
+      }
+      
+      const statementDay = parseInt(formData.statementDay);
+      const paymentDueDay = parseInt(formData.paymentDueDay);
+      if (isNaN(statementDay) || statementDay < 1 || statementDay > 31) {
+        alert('Please enter a valid statement day (1-31)');
+        return;
+      }
+      if (isNaN(paymentDueDay) || paymentDueDay < 1 || paymentDueDay > 31) {
+        alert('Please enter a valid payment due day (1-31)');
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       await cardsService.create({

@@ -2,8 +2,9 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Mail, Shield, Calendar } from 'lucide-react';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const { user } = useAuth();
 
   return (
@@ -74,5 +75,13 @@ export default function ProfilePage() {
         <div className="text-slate-600 text-sm tracking-widest">— SPENDFLOW</div>
       </div>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <AuthGate>
+      <ProfilePageContent />
+    </AuthGate>
   );
 }

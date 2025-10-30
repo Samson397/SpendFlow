@@ -8,8 +8,9 @@ import { cardsService } from '@/lib/firebase/firestore';
 import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
 import { RecurringExpense } from '@/types/recurring';
 import { Card } from '@/types';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function CalendarPage() {
+function CalendarPageContent() {
   const { user } = useAuth();
   const { formatAmount } = useCurrency();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -289,5 +290,13 @@ export default function CalendarPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function CalendarPage() {
+  return (
+    <AuthGate>
+      <CalendarPageContent />
+    </AuthGate>
   );
 }

@@ -10,8 +10,9 @@ import { Transaction } from '@/types';
 import { format } from 'date-fns';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { EditTransactionModal } from '@/components/transactions/EditTransactionModal';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function TransactionsPage() {
+function TransactionsPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
@@ -251,5 +252,13 @@ export default function TransactionsPage() {
         <div className="text-slate-600 text-sm tracking-widest">— FINANCIAL WISDOM</div>
       </div>
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <AuthGate>
+      <TransactionsPageContent />
+    </AuthGate>
   );
 }

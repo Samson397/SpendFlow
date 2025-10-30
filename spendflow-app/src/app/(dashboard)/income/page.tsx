@@ -8,8 +8,9 @@ import { TrendingUp, Plus, CreditCard } from 'lucide-react';
 import { transactionsService, cardsService } from '@/lib/firebase/firestore';
 import { Transaction } from '@/types';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
+import { AuthGate } from '@/components/auth/AuthGate';
 
-export default function IncomePage() {
+function IncomePageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
@@ -172,5 +173,13 @@ export default function IncomePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function IncomePage() {
+  return (
+    <AuthGate>
+      <IncomePageContent />
+    </AuthGate>
   );
 }
