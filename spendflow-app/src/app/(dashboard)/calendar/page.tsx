@@ -17,6 +17,13 @@ function CalendarPageContent() {
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [creditCards, setCreditCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+
+  useEffect(() => {
+    // Check if the device supports touch events
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    setIsTouchDevice(isTouch);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -88,8 +95,9 @@ function CalendarPageContent() {
     );
   }
 
+
   return (
-    <div className="space-y-12">
+    <div className="space-y-12" data-touch={isTouchDevice ? 'true' : 'false'}>
       {/* Header */}
       <div className="text-center">
         <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
@@ -163,7 +171,18 @@ function CalendarPageContent() {
                   isToday 
                     ? 'border-amber-600 bg-amber-900/20' 
                     : 'border-slate-800 bg-slate-900/30'
-                } p-2 hover:border-amber-600/50 transition-all relative group`}
+                } p-2 hover:border-amber-600/50 focus:border-amber-600/50 active:border-amber-600/50 transition-all relative group`}
+                onTouchStart={(e) => {
+                  // Add active state on touch start
+                  e.currentTarget.classList.add('bg-slate-800/50');
+                }}
+                onTouchEnd={(e) => {
+                  // Remove active state after a short delay
+                  setTimeout(() => {
+                    e.currentTarget.classList.remove('bg-slate-800/50');
+                  }, 200);
+                }}
+                tabIndex={0} // Make it focusable for keyboard navigation
               >
                 <div className={`text-sm font-serif ${
                   isToday ? 'text-amber-400' : 'text-slate-300'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +21,8 @@ function SignupContent() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -30,6 +32,31 @@ function SignupContent() {
       router.replace('/dashboard');
     }
   }, [user, authLoading, router]);
+
+  // Handle resend cooldown
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  const handleResendVerification = async () => {
+    if (resendCooldown > 0) return;
+    
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        await sendEmailVerification(user, {
+          url: `${window.location.origin}/dashboard?verified=true`,
+        });
+        setResendCooldown(60); // 60 seconds cooldown
+        setError('');
+      }
+    } catch (error) {
+      setError('Failed to resend verification email. Please try again.');
+    }
+  };
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +81,11 @@ function SignupContent() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
+      // Send verification email
+      await sendEmailVerification(user, {
+        url: `${window.location.origin}/dashboard?verified=true`,
+      });
+      
       // Update user profile with display name
       await updateProfile(user, {
         displayName: name,
@@ -64,12 +96,15 @@ function SignupContent() {
         uid: user.uid,
         displayName: name,
         email: user.email,
+        emailVerified: false, // Track verification status in Firestore
         photoURL: user.photoURL || '',
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         currency: 'USD', // Default currency
       });
       
-      router.replace('/dashboard');
+      // Show verification message instead of redirecting
+      setVerificationSent(true);
     } catch (error: unknown) {
       const firebaseError = error as SignupError;
       let errorMessage = 'Failed to create an account';
@@ -116,6 +151,76 @@ function SignupContent() {
       setLoading(false);
     }
   };
+
+  if (verificationSent) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-100">
+            Verify Your Email
+          </h2>
+          <p className="mt-2 text-center text-sm text-slate-400">
+            We've sent a verification link to {email}
+          </p>
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-slate-800 py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="mt-2 text-lg font-medium text-slate-100">Check your email</h3>
+              <p className="mt-1 text-sm text-slate-400">
+                We've sent a verification link to <span className="font-medium text-slate-200">{email}</span>.
+              </p>
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendCooldown > 0}
+                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                    resendCooldown > 0 
+                      ? 'bg-slate-600 cursor-not-allowed' 
+                      : 'bg-amber-600 hover:bg-amber-700 focus:ring-2 focus:ring-offset-2 focus:ring-amber-500'
+                  }`}
+                >
+                  {resendCooldown > 0 
+                    ? `Resend in ${resendCooldown}s` 
+                    : 'Resend Verification Email'}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationSent(false);
+                    setLoading(false);
+                    setError('');
+                  }}
+                  className="w-full flex justify-center py-2 px-4 border border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                >
+                  Back to Sign Up
+                </button>
+                
+                {error && (
+                  <div className="text-red-400 text-sm text-center mt-2">
+                    {error}
+                  </div>
+                )}
+                
+                <div className="text-xs text-slate-500 mt-4 text-center">
+                  <p>Didn't receive the email? Check your spam folder.</p>
+                  <p>Make sure to check the email you used to sign up: <span className="text-slate-300">{email}</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">

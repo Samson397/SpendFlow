@@ -117,7 +117,9 @@ function DashboardContent() {
   };
 
   useEffect(() => {
-    fetchData();
+    if (user) {
+      fetchData();
+    }
   }, [user]);
 
   if (loading) {
@@ -141,6 +143,11 @@ function DashboardContent() {
       return;
     }
     setShowTransactionModal(true);
+  };
+
+  const handleViewCardsClick = (type: 'credit' | 'debit') => {
+    setSelectedCardType(type);
+    setShowCardsModal(true);
   };
 
   return (
@@ -197,20 +204,6 @@ function DashboardContent() {
             <span className="hidden sm:inline">Add Transaction</span>
             <span className="sm:hidden">Add</span>
           </button>
-        </div>
-
-        {/* Main Balance Card */}
-        <div className="mb-12">
-          <div className="bg-gradient-to-br from-amber-900/20 via-slate-900/50 to-slate-900/20 border border-amber-700/30 rounded-sm p-12 backdrop-blur-sm">
-            <div className="text-center">
-              <div className="text-amber-400/60 text-xs tracking-widest uppercase mb-4 font-serif">Total Balance</div>
-              <div className="text-7xl font-serif text-slate-100 mb-2">{formatAmount(stats.totalBalance)}</div>
-              <div className="flex items-center justify-center gap-2 text-amber-400">
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-sm tracking-wider">Across {cards.length} Accounts</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Card Balance Grid */}

@@ -46,14 +46,14 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
           <Loader2 className="mx-auto h-12 w-12 text-amber-400 animate-spin" />
-          <p className="mt-4 text-slate-400 font-serif tracking-wider">Redirecting...</p>
+          <p className="mt-4 text-slate-400 font-serif tracking-wider">Redirecting to login...</p>
         </div>
       </div>
     );
   }
 
   // Check if user is trying to access admin route without admin privileges
-  if (requireAdmin && user.uid !== process.env.NEXT_PUBLIC_ADMIN_UID) {
+  if (requireAdmin && user && user.uid !== process.env.NEXT_PUBLIC_ADMIN_UID) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">

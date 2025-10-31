@@ -4,12 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
-import { CurrencySelector } from '@/components/settings/CurrencySelector';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
 import { useEffect, useState } from 'react';
 import { usersService } from '@/lib/firebase/firestore';
-import Image from 'next/image';
+import dynamic from 'next/dynamic';
 
 type NavItem = {
   name: string;
@@ -28,6 +27,9 @@ const navigation: NavItem[] = [
   { name: 'Profile', href: '/profile', icon: UserIcon },
   { name: 'Admin', href: '/admin', icon: ShieldCheckIcon, adminOnly: true },
 ];
+
+// Dynamically import AdManager with no SSR
+const AdManager = dynamic(() => import('@/components/ads/AdManager'), { ssr: false });
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -88,11 +90,37 @@ export default function Sidebar() {
 
   return (
     <>
+      {/* Mobile Menu */}
+      <div className={`fixed inset-0 z-30 bg-slate-950/95 backdrop-blur-sm transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out md:hidden`}>
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between p-3 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-serif text-slate-100">Menu</h2>
+            </div>
+            <button
+              onClick={closeMobileMenu}
+              className="p-1 rounded-md text-slate-400 hover:text-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
+          <nav className="flex-1 overflow-y-auto py-2">
+            {renderNavLinks()}
+          </nav>
+        </div>
+      </div>
+
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-amber-900/30">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-serif text-slate-100 tracking-widest">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-1 rounded-md text-slate-400 hover:text-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <Bars3Icon className="h-6 w-6" />
+            </button>
+            <h1 className="text-lg font-serif text-slate-100 tracking-widest">
               SPENDFLOW
             </h1>
           </div>
@@ -109,60 +137,12 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-30 bg-black bg-opacity-50"
-          onClick={closeMobileMenu}
-        />
-      )}
-
-      {/* Mobile Menu Drawer */}
-      <div
-        className={`md:hidden fixed top-0 left-0 bottom-0 z-40 w-64 bg-slate-800 shadow-2xl transform transition-transform duration-300 ease-in-out ${
-          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center shrink-0 px-4 py-5 border-b border-slate-600">
-            <h1 className="text-2xl font-serif text-slate-100 tracking-widest">
-              SPENDFLOW
-            </h1>
-          </div>
-          <div className="flex-1 overflow-y-auto py-4 px-3 bg-slate-800">
-            <nav className="space-y-1">
-              {renderNavLinks()}
-            </nav>
-          </div>
-          <div className="shrink-0 p-4 border-t border-slate-600 bg-slate-800 space-y-3">
-            {/* Currency Selector for Mobile */}
-            <div>
-              <CurrencySelector />
-            </div>
-            
-            <button
-              onClick={() => {
-                handleSignOut();
-                closeMobileMenu();
-              }}
-              className="flex items-center w-full px-3 py-3 text-sm font-medium text-slate-200 rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
-            >
-              <ArrowLeftOnRectangleIcon className="w-6 h-6 mr-3 text-slate-300" />
-              Sign out
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Desktop Sidebar */}
       <div className="hidden md:flex md:shrink-0">
-        <div className="flex flex-col w-64">
-          <div className="flex flex-col grow pt-5 pb-4 overflow-y-auto bg-slate-950 border-r border-amber-900/30">
-            <div className="flex flex-col items-center shrink-0 px-4 mb-8">
-              <div className="w-10 h-10 relative mb-3">
-                <Image src="/logo.svg" alt="SpendFlow" width={40} height={40} />
-              </div>
-              <h1 className="text-2xl font-serif text-slate-100 tracking-widest">
+        <div className="flex flex-col w-64 border-r border-slate-800 bg-slate-900/50">
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-col items-center justify-center h-24 shrink-0 px-4 bg-gradient-to-r from-slate-800/50 to-slate-900/50">
+              <h1 className="text-xl font-serif text-slate-100 tracking-widest">
                 SPENDFLOW
               </h1>
               <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-600 to-transparent mt-3"></div>
@@ -174,17 +154,25 @@ export default function Sidebar() {
             </div>
             <div className="shrink-0 p-4 border-t border-slate-600 space-y-3">
               {/* Currency Selector */}
-              <div className="mb-3">
-                <CurrencySelector />
+              <div className="mt-auto space-y-4">
+                {/* Ad - Desktop only */}
+                <div className="hidden md:block p-2 rounded-lg bg-slate-800/50">
+                  <p className="text-xs text-slate-400 mb-1 text-center">Advertisement</p>
+                  <AdManager adUnit="SIDEBAR" className="rounded overflow-hidden" />
+                </div>
+                
+                <div className="pt-2 border-t border-slate-700">
+                  <div className="px-2 space-y-1">
+                    <button
+                      onClick={handleSignOut}
+                      className="group flex items-center w-full px-2 py-2 text-sm font-medium rounded-md text-slate-300 hover:bg-slate-800 hover:text-white"
+                    >
+                      <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-400 group-hover:text-slate-300" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
               </div>
-              
-              <button
-                onClick={handleSignOut}
-                className="flex items-center w-full px-3 py-3 text-sm font-medium text-slate-200 rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
-              >
-                <ArrowLeftOnRectangleIcon className="w-6 h-6 mr-3 text-slate-300" />
-                Sign out
-              </button>
             </div>
           </div>
         </div>

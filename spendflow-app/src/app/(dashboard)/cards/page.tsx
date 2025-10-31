@@ -23,21 +23,23 @@ function CardsPageContent() {
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    const loadCards = async () => {
+      if (user) {
+        try {
+          const allCards = await cardsService.getAll();
+          const userCards = allCards.filter(card => card.userId === user.uid);
+          setCards(userCards);
+        } catch (error) {
+          console.error('Error loading cards:', error);
+          toast.error('Failed to load cards');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
     loadCards();
   }, [user]);
-
-  const loadCards = async () => {
-    try {
-      setLoading(true);
-      const data = await cardsService.getByUserId(user!.uid);
-      setCards(data);
-    } catch (error) {
-      console.error('Error loading cards:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const totalBalance = cards.reduce((sum, card) => sum + card.balance, 0);
 
@@ -49,30 +51,28 @@ function CardsPageContent() {
     );
   }
 
-  const handleAddCard = () => {
+  const handleAddCardClick = () => {
     setShowModal(true);
   };
 
-  const handleEditCard = (card: CardType) => {
+  const handleEditClick = (card: CardType) => {
     setSelectedCard(card);
     setShowEditModal(true);
   };
 
-  const handleDeleteCard = async (card: CardType) => {
-    if (window.confirm(`Delete ${card.type} card? This will delete all associated transactions.`)) {
+  const handleDeleteClick = async (cardId: string) => {
+    if (window.confirm('Are you sure you want to delete this card?')) {
       try {
-        await cardsService.delete(card.id);
-        toast.success('Card deleted successfully!');
-        loadCards();
+        if (user) {
+          await cardsService.deleteCard(user.uid, cardId);
+          setCards(cards.filter(card => card.id !== cardId));
+          toast.success('Card deleted successfully');
+        }
       } catch (error) {
         console.error('Error deleting card:', error);
         toast.error('Failed to delete card');
       }
     }
-  };
-
-  const handleSuccess = () => {
-    loadCards();
   };
 
   return (
@@ -81,7 +81,6 @@ function CardsPageContent() {
       <AddCardModal 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
-        onSuccess={handleSuccess}
       />
       
       {selectedCard && (
@@ -92,7 +91,6 @@ function CardsPageContent() {
             setShowEditModal(false);
             setSelectedCard(null);
           }}
-          onSuccess={handleSuccess}
         />
       )}
       {/* Header */}
@@ -104,7 +102,7 @@ function CardsPageContent() {
           <p className="text-slate-400 text-sm tracking-widest uppercase">Payment Methods</p>
         </div>
         <button
-          onClick={handleAddCard}
+          onClick={handleAddCardClick}
           className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
         >
           <Plus className="h-5 w-5" />
@@ -149,15 +147,15 @@ function CardsPageContent() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleEditCard(card)}
-                        className="p-2 text-slate-400 hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Edit card"
+                        className="p-2 text-slate-400 hover:text-amber-400 transition-colors"
+                        aria-label="Edit card"
                       >
                         <Edit2 className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => handleDeleteCard(card)}
-                        className="p-2 text-slate-400 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Delete card"
+                        className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                        aria-label="Delete card"
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>
@@ -186,7 +184,7 @@ function CardsPageContent() {
           <h3 className="text-2xl font-serif text-slate-100 mb-3">No Cards Yet</h3>
           <p className="text-slate-400 mb-8 tracking-wide">Begin your premium financial journey</p>
           <button 
-            onClick={handleAddCard}
+            onClick={handleAddCardClick}
             className="px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
           >
             Add Your First Card

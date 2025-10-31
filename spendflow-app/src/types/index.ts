@@ -1,3 +1,13 @@
+export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+
+export interface SubscriptionInfo {
+  tier: SubscriptionTier;
+  status: 'active' | 'canceled' | 'past_due' | 'unpaid';
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  startDate: Date;
+}
+
 export interface UserProfile {
   id: string;
   uid: string;
@@ -6,6 +16,21 @@ export interface UserProfile {
   photoURL?: string;
   currency: string;
   isAdmin?: boolean;
+  disabled?: boolean;
+  emailVerified?: boolean;
+  lastActive?: Date;
+  metadata?: {
+    lastSignInTime?: string;
+    creationTime?: string;
+  };
+  subscription: SubscriptionInfo;
+  features: {
+    maxCards: number;
+    maxTransactions: number;
+    analytics: boolean;
+    export: boolean;
+    prioritySupport: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

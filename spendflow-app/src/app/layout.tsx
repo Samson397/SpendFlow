@@ -1,18 +1,30 @@
 import type { Metadata } from 'next';
-import { Playfair_Display, Inter } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { Toaster } from 'react-hot-toast';
+import CookieBannerWrapper from '@/components/layout/CookieBannerWrapper';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'SpendFlow - Luxury Financial Management',
-  description: 'Elegant financial tracking with multi-currency support, credit card management, and automated payments',
-  manifest: '/manifest.json',
-  themeColor: '#f59e0b',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  title: 'SpendFlow - Premium Financial Management',
+  description: 'Track expenses, manage cards, and gain financial insights with SpendFlow.',
+  applicationName: 'SpendFlow',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SpendFlow',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  themeColor: '#0f172a', // slate-900
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
@@ -23,6 +35,14 @@ export const metadata: Metadata = {
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    minimumScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+    viewportFit: 'cover',
+  },
 };
 
 export default function RootLayout({
@@ -31,31 +51,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full bg-slate-900">
-      <body className={`${inter.variable} font-sans h-full`}>
+    <html lang="en" className="h-full">
+      <body className={`${inter.variable} font-sans h-full bg-slate-900 text-slate-100 antialiased`}>
         <AuthProvider>
           <CurrencyProvider>
+            <CookieBannerWrapper />
             {children}
-            <Toaster 
-              position="top-right"
+            <Toaster
+              position="bottom-right"
               toastOptions={{
-                duration: 3000,
                 style: {
-                  background: '#0f172a',
+                  background: '#1e293b',
                   color: '#f8fafc',
-                  border: '1px solid #f59e0b',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#f59e0b',
-                    secondary: '#0f172a',
-                  },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#0f172a',
-                  },
+                  border: '1px solid #334155',
+                  fontFamily: 'Inter, sans-serif',
                 },
               }}
             />
