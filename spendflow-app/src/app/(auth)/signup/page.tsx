@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile, sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { AuthGate } from '@/components/auth/AuthGate';
+import { alertsService } from '@/lib/alerts';
+import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
 
 type SignupError = {
   code: string;
@@ -23,8 +25,36 @@ function SignupContent() {
   const [loading, setLoading] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true); // Default to enabled
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+
+  // Check if registration is enabled
+  useEffect(() => {
+    const checkRegistrationEnabled = async () => {
+      try {
+        const settingsRef = doc(db, 'settings', 'app');
+        const settingsDoc = await getDoc(settingsRef);
+        
+        if (settingsDoc.exists()) {
+          const settings = settingsDoc.data();
+          const enabled = settings.registrationEnabled !== false; // Default to true if not set
+          setRegistrationEnabled(enabled);
+          console.log('Registration enabled:', enabled);
+        } else {
+          // No settings document, default to enabled
+          setRegistrationEnabled(true);
+          console.log('No settings found, registration enabled by default');
+        }
+      } catch (error) {
+        console.error('Error checking registration settings:', error);
+        // On error, default to enabled to not block users
+        setRegistrationEnabled(true);
+      }
+    };
+
+    checkRegistrationEnabled();
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -103,22 +133,24 @@ function SignupContent() {
         currency: 'USD', // Default currency
       });
       
+      // Generate alert for new user registration
+      try {
+        await alertsService.userRegistered(user.uid, user.email || 'Unknown', 'free');
+      } catch (alertError) {
+        console.warn('Failed to create registration alert:', alertError);
+        // Don't fail registration if alert creation fails
+      }
+
+      // Check if user is admin and redirect accordingly
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+
+      const isAdmin = user.email ? adminEmails.includes(user.email) : false;
+
       // Show verification message instead of redirecting
       setVerificationSent(true);
-    } catch (error: unknown) {
-      const firebaseError = error as SignupError;
-      let errorMessage = 'Failed to create an account';
-      
-      // Handle specific error cases
-      if (firebaseError.code === 'auth/email-already-in-use') {
-        errorMessage = 'Email is already in use';
-      } else if (firebaseError.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address';
-      } else if (firebaseError.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak';
-      }
-      
-      setError(errorMessage);
+    } catch (error: any) {
+      const friendlyError = getFirebaseAuthError(error);
+      setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
     } finally {
       setLoading(false);
     }
@@ -143,10 +175,23 @@ function SignupContent() {
         currency: 'USD', // Default currency
       }, { merge: true });
       
-      router.replace('/dashboard');
-    } catch (error: unknown) {
-      const firebaseError = error as SignupError;
-      setError(firebaseError.message || 'Failed to sign up with Google');
+      // Generate alert for new user registration via Google
+      try {
+        await alertsService.userRegistered(user.uid, user.email || 'Unknown', 'free');
+      } catch (alertError) {
+        console.warn('Failed to create Google registration alert:', alertError);
+        // Don't fail registration if alert creation fails
+      }
+
+      // Check if user is admin and redirect accordingly
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+
+      const isAdmin = user.email ? adminEmails.includes(user.email) : false;
+
+      router.replace(isAdmin ? '/admin' : '/dashboard');
+    } catch (error: any) {
+      const friendlyError = getFirebaseAuthError(error);
+      setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
     } finally {
       setLoading(false);
     }
@@ -160,7 +205,7 @@ function SignupContent() {
             Verify Your Email
           </h2>
           <p className="mt-2 text-center text-sm text-slate-400">
-            We've sent a verification link to {email}
+            We&apos;ve sent a verification link to {email}
           </p>
         </div>
 
@@ -174,7 +219,7 @@ function SignupContent() {
               </div>
               <h3 className="mt-2 text-lg font-medium text-slate-100">Check your email</h3>
               <p className="mt-1 text-sm text-slate-400">
-                We've sent a verification link to <span className="font-medium text-slate-200">{email}</span>.
+                We&apos;ve sent a verification link to <span className="font-medium text-slate-200">{email}</span>.
               </p>
               <div className="mt-6 space-y-3">
                 <button
@@ -211,7 +256,7 @@ function SignupContent() {
                 )}
                 
                 <div className="text-xs text-slate-500 mt-4 text-center">
-                  <p>Didn't receive the email? Check your spam folder.</p>
+                  <p>Didn&apos;t receive the email? Check your spam folder.</p>
                   <p>Make sure to check the email you used to sign up: <span className="text-slate-300">{email}</span></p>
                 </div>
               </div>
@@ -222,16 +267,70 @@ function SignupContent() {
     );
   }
 
+  // If registration is disabled, show disabled message
+  if (!registrationEnabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          {/* Header */}
+          <div className="text-center">
+            <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
+            <h1 className="text-5xl font-serif text-slate-100 mb-4 tracking-wide">
+              S P E N D F L O W
+            </h1>
+            <div className="w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
+            <h2 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">
+              Registration Disabled
+            </h2>
+          </div>
+
+          {/* Disabled Message */}
+          <div className="bg-slate-900/50 border border-slate-800 backdrop-blur-sm p-8 text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="h-8 w-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-serif text-slate-100 mb-2">
+                New Registrations Temporarily Disabled
+              </h3>
+              <p className="text-slate-400 text-sm tracking-wide">
+                We&apos;re currently not accepting new user registrations. Please check back later or contact support if you believe this is an error.
+              </p>
+            </div>
+
+            <div className="pt-4">
+              <Link
+                href="/login"
+                className="inline-flex items-center px-6 py-3 border border-amber-600 text-amber-400 bg-amber-900/10 hover:bg-amber-600/20 focus:outline-none focus:ring-2 focus:ring-amber-500 font-serif tracking-widest uppercase text-sm transition-all"
+              >
+                Go to Login
+              </Link>
+            </div>
+          </div>
+
+          {/* Quote */}
+          <div className="text-center pt-8 border-t border-slate-800">
+            <p className="text-slate-500 text-sm font-serif italic">
+              &quot;Thank you for your interest in SpendFlow.&quot;
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
+          <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
           <h1 className="text-5xl font-serif text-slate-100 mb-4 tracking-wide">
             S P E N D F L O W
           </h1>
-          <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
+          <div className="w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
           <h2 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">
             Join Us
           </h2>

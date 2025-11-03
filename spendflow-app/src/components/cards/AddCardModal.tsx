@@ -21,6 +21,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
     name: '',
     type: 'debit' as 'debit' | 'credit',
     lastFour: '',
+    expiryDate: '',
     balance: '',
     color: '#3b82f6',
     creditLimit: '',
@@ -32,48 +33,86 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    console.log('🚀 Form submit triggered');
+    if (!user) {
+      console.log('❌ No user found');
+      return;
+    }
 
     // Validation
     if (!formData.name.trim()) {
-      alert('Please enter a card name');
+      toast.error('Please enter a card name');
+      return;
+    }
+
+    if (!formData.lastFour || formData.lastFour.length !== 4) {
+      toast.error('Please enter the last 4 digits of your card');
+      return;
+    }
+
+    // Validate expiry date format (MM/YY)
+    if (!formData.expiryDate) {
+      toast.error('Please enter the card expiry date');
+      return;
+    }
+
+    const expiryRegex = /^(0[1-9]|1[0-2])\/([0-9]{2})$/;
+    if (!expiryRegex.test(formData.expiryDate)) {
+      toast.error('Please enter expiry date in MM/YY format (e.g., 12/25)');
       return;
     }
 
     const balance = parseFloat(formData.balance);
     if (isNaN(balance)) {
-      alert('Please enter a valid balance');
+      toast.error('Please enter a valid balance');
       return;
     }
 
     if (formData.type === 'credit') {
       const creditLimit = parseFloat(formData.creditLimit);
       if (isNaN(creditLimit) || creditLimit <= 0) {
-        alert('Please enter a valid credit limit greater than 0');
+        toast.error('Please enter a valid credit limit greater than 0');
         return;
       }
-      
+
       const statementDay = parseInt(formData.statementDay);
       const paymentDueDay = parseInt(formData.paymentDueDay);
       if (isNaN(statementDay) || statementDay < 1 || statementDay > 31) {
-        alert('Please enter a valid statement day (1-31)');
+        toast.error('Please enter a valid statement day (1-31)');
         return;
       }
       if (isNaN(paymentDueDay) || paymentDueDay < 1 || paymentDueDay > 31) {
-        alert('Please enter a valid payment due day (1-31)');
+        toast.error('Please enter a valid payment due day (1-31)');
         return;
       }
     }
 
     try {
       setLoading(true);
+
+      // Check for duplicate cards
+      const existingCards = await cardsService.getByUserId(user.uid);
+      console.log('🔍 Duplicate check:', {
+        existingCards: existingCards.length,
+        lastFourToCheck: formData.lastFour,
+        existingLastFours: existingCards.map(card => card.lastFour)
+      });
+
+      const duplicateCard = existingCards.find(card => card.lastFour === formData.lastFour);
+
+      if (duplicateCard) {
+        console.log('❌ Duplicate card found:', duplicateCard);
+        toast.error(`A card ending in ${formData.lastFour} already exists. Please check your cards or enter different digits.`);
+        return;
+      }
+
       await cardsService.create({
         userId: user.uid,
         name: formData.name,
         lastFour: formData.lastFour,
         cardNumber: `****${formData.lastFour}`,
         cardHolder: user.displayName || 'Card Holder',
-        expiryDate: '12/25',
+        expiryDate: formData.expiryDate,
         cvv: '***',
         balance: parseFloat(formData.balance) || 0,
         type: formData.type,
@@ -86,14 +125,17 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
           creditLimit: parseFloat(formData.creditLimit) || parseFloat(formData.balance) || 0,
         }),
       });
-      
+
       onSuccess();
       onClose();
-      
+
+      toast.success('Card added successfully!');
+
       // Reset form
       setFormData({
         name: '',
         lastFour: '',
+        expiryDate: '',
         balance: '',
         type: 'debit',
         color: '#3b82f6',
@@ -103,7 +145,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
       });
     } catch (error) {
       console.error('Error adding card:', error);
-      alert('Failed to add card. Please try again.');
+      toast.error('Failed to add card. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -188,6 +230,30 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
               placeholder="1234"
               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
             />
+          </div>
+
+          {/* Expiry Date */}
+          <div>
+            <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+              Expiry Date
+            </label>
+            <input
+              type="text"
+              required
+              maxLength={5}
+              value={formData.expiryDate}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 2) {
+                  setFormData({ ...formData, expiryDate: `${value.slice(0, 2)}/${value.slice(2, 4)}` });
+                } else {
+                  setFormData({ ...formData, expiryDate: value });
+                }
+              }}
+              placeholder="MM/YY"
+              className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
+            />
+            <p className="text-slate-500 text-xs mt-1">Format: MM/YY (e.g., 12/25)</p>
           </div>
 
           {/* Balance */}

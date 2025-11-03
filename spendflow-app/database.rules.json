@@ -3,6 +3,7 @@
     ".read": "auth != null",
     ".write": "auth != null",
     "status": {
+      ".read": "auth != null",
       "$uid": {
         ".read": true,
         ".write": "auth != null && auth.uid === $uid"

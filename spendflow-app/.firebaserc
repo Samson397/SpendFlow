@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "chat-76d96"
-  }
+    "default": "chat-76d96",
+    "spendflow": "chat-76d96"
+  },
+  "targets": {},
+  "etags": {}
 }

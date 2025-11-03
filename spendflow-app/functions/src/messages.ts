@@ -17,7 +17,17 @@ interface Message {
 }
 
 // Get all messages (for admin)
-export const getMessages = onCall(async (request) => {
+export const getMessages = onCall(
+  {
+    cors: [
+      {
+        origin: true,
+        methods: ['POST'],
+      },
+    ],
+    region: 'us-central1',
+  },
+  async (request) => {
   // Check if user is authenticated
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
@@ -48,7 +58,17 @@ export const getMessages = onCall(async (request) => {
 });
 
 // Get a single message
-export const getMessage = onCall(async (request) => {
+export const getMessage = onCall(
+  {
+    cors: [
+      {
+        origin: true,
+        methods: ['POST'],
+      },
+    ],
+    region: 'us-central1',
+  },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -94,7 +114,17 @@ export const getMessage = onCall(async (request) => {
 });
 
 // Send a new message
-export const sendMessage = onCall(async (request) => {
+export const sendMessage = onCall(
+  {
+    cors: [
+      {
+        origin: true,
+        methods: ['POST'],
+      },
+    ],
+    region: 'us-central1',
+  },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -131,7 +161,17 @@ export const sendMessage = onCall(async (request) => {
 });
 
 // Update message (mark as read, add/remove labels, etc.)
-export const updateMessage = onCall(async (request) => {
+export const updateMessage = onCall(
+  {
+    cors: [
+      {
+        origin: true,
+        methods: ['POST'],
+      },
+    ],
+    region: 'us-central1',
+  },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -182,7 +222,17 @@ export const updateMessage = onCall(async (request) => {
 });
 
 // Delete a message
-export const deleteMessage = onCall(async (request) => {
+export const deleteMessage = onCall(
+  {
+    cors: [
+      {
+        origin: true,
+        methods: ['POST'],
+      },
+    ],
+    region: 'us-central1',
+  },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }

@@ -1,0 +1,5 @@
+22:28:43.030 [NamespaceSystem-akka.actor.default-dispatcher-5] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
+22:28:43.176 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
+22:28:50.643 [NamespaceSystem-akka.actor.default-dispatcher-5] INFO com.firebase.core.namespace.NamespaceActor - chat-76d96-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 81ms, init: 0ms
+22:28:50.681 [NamespaceSystem-blocking-namespace-operation-dispatcher-7] INFO com.firebase.core.namespace.StateManager - Namespace chat-76d96-default-rtdb status Active to Active
+23:44:56.616 [Thread-0] INFO com.firebase.server.forge.App$ - Attempting graceful shutdown.

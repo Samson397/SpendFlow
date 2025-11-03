@@ -1,27 +1,29 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import dynamic from 'next/dynamic';
 import { 
   collection, 
   getCountFromServer, 
   query, 
   where,
+  limit,
   getFirestore, 
   doc, 
   getDoc,
-  QueryConstraint
+  QueryConstraint,
+  Timestamp,
+  getDocs
 } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { 
   Users, 
   CreditCard, 
   MessageSquare, 
-  Settings, 
-  Server,
-  Mail
+  Settings,
+  ShieldCheckIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,32 +43,13 @@ const AdminTabs = dynamic(() => import('@/components/admin/AdminTabs'), {
   ),
 });
 
-// Dynamic imports for better performance
-const StatusPage = dynamic(() => import('@/components/admin/StatusPage'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center p-8">
-      <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-400 border-t-transparent"></div>
-    </div>
-  ),
-});
-
-// Import ContactMessages component
-const ContactMessages = dynamic(() => import('@/components/admin/ContactMessages'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center p-8">
-      <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-400 border-t-transparent"></div>
-    </div>
-  ),
-});
-
 type SystemHealthStatus = 'operational' | 'degraded' | 'maintenance';
 
 interface AdminStats {
   totalUsers: number;
   totalCards: number;
   totalTransactions: number;
+  totalTransactionValue: number;
   totalMessages: number;
   newMessages: number;
   systemHealth: SystemHealthStatus;
@@ -78,27 +61,15 @@ interface AdminStats {
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const router = useRouter();
   const [checkingAdmin, setCheckingAdmin] = useState(true);
-  const [activeTab, setActiveTab] = useState('status');
-  // Helper function to check system health
-  const checkSystemHealth = useCallback(async (): Promise<boolean> => {
-    try {
-      // Check database connection
-      const firestore = getFirestore();
-      await getDoc(doc(firestore, 'system/health'));
-      return true;
-    } catch (error) {
-      console.error('System health check failed:', error);
-      return false;
-    }
-  }, []);
-
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalCards: 0,
     totalTransactions: 0,
+    totalTransactionValue: 0,
     totalMessages: 0,
     newMessages: 0,
     systemHealth: 'operational',
@@ -108,44 +79,145 @@ export default function AdminPage() {
     loading: true
   });
 
-  const loadStats = useCallback(async () => {
+  const checkSystemHealth = useCallback(async (): Promise<boolean> => {
     try {
-      console.log('Loading stats...');
+      // Check database connection with timeout
+      const firestore = getFirestore();
+      const healthCheck = doc(firestore, 'system/health');
+
+      // Use a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Health check timeout')), 5000)
+      );
+
+      await Promise.race([
+        getDoc(healthCheck),
+        timeoutPromise
+      ]);
+
+      return true;
+    } catch (error) {
+      console.warn('System health check failed (this is expected if system/health doesn\'t exist):', error);
+      return false; // Don't throw, just return false
+    }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    // Safety timeout to force clear loading state if it gets stuck
+    const safetyTimeout = setTimeout(() => {
+      console.warn('🚨 Safety timeout: Forcing loading state clear');
+      setStats(prev => ({ ...prev, loading: false }));
+      setLoadingTimeout(true);
+    }, 30000); // 30 second safety timeout
+
+    try {
+      console.log('📊 Loading admin statistics...');
       setStats(prev => ({ ...prev, loading: true }));
-      
-      // Get date ranges
+
+      // Set a timeout to show fallback UI if loading takes too long
+      const timeoutId = setTimeout(() => {
+        console.warn('⚠️ Stats loading is taking longer than expected...');
+        setLoadingTimeout(true);
+      }, 8000); // 8 second timeout
+
       const now = new Date();
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(now.getDate() - 30);
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
       // Convert dates to Firestore Timestamps for queries
       const toFirestoreTimestamp = (date: Date) => {
-        return { seconds: Math.floor(date.getTime() / 1000), nanoseconds: 0 };
+        return Timestamp.fromDate(date);
       };
-      
+
       // Helper function to safely get count from a collection
       const safeGetCount = async (
-        collectionPath: string, 
+        collectionPath: string,
+        isAdmin: boolean,
         ...queryConstraints: QueryConstraint[]
       ): Promise<number> => {
         try {
-          console.log(`Fetching count for ${collectionPath}...`);
-          const collectionRef = collection(db, collectionPath);
-          const q = queryConstraints.length > 0 
-            ? query(collectionRef, ...queryConstraints) 
-            : query(collectionRef);
-          const snapshot = await getCountFromServer(q);
-          const count = snapshot.data().count;
-          console.log(`Count for ${collectionPath}:`, count);
-          return count;
+          if (!user) {
+            console.error('❌ No authenticated user for count query');
+            return 0;
+          }
+
+          const timestamp = new Date().toISOString();
+          console.log(`[${timestamp}] 🔍 Fetching count for ${collectionPath}`, {
+            queryConstraints,
+            isAdmin,
+            userId: user.uid
+          });
+
+          // Add admin check for sensitive collections
+          const isSensitiveCollection = ['users', 'transactions', 'messages'].includes(collectionPath);
+          if (isSensitiveCollection && !isAdmin) {
+            console.warn('⚠️ Insufficient permissions for collection:', collectionPath);
+            return 0;
+          }
+
+          // Use a different approach to count documents
+          const queryPromise = (async () => {
+            try {
+              // Use a simple query with a limit to count documents
+              const collectionRef = collection(db, collectionPath);
+              let q = query(collectionRef, limit(1000)); // Limit to prevent large reads
+
+              // Apply additional query constraints if provided
+              if (queryConstraints.length > 0) {
+                q = query(collectionRef, ...queryConstraints, limit(1000));
+              }
+
+              console.log(`[${timestamp}] Executing count query for ${collectionPath}:`, q);
+
+              const querySnapshot = await getDocs(q);
+              const docs = querySnapshot.docs;
+
+              console.log(`[${timestamp}] ✅ Successfully counted ${docs.length} documents in ${collectionPath}`);
+              return docs.length;
+
+            } catch (error) {
+              // Log the raw error first
+              console.error(`[${timestamp}] ❌ Raw error for ${collectionPath}:`, error);
+
+              // Then log the stringified version
+              try {
+                console.error(`[${timestamp}] ❌ Stringified error:`, JSON.stringify(error, null, 2));
+              } catch (e) {
+                console.error(`[${timestamp}] ❌ Could not stringify error:`, e);
+              }
+
+              // Fallback to a simple count with no filters
+              try {
+                console.log(`[${timestamp}] Trying simple count without filters...`);
+                const collectionRef = collection(db, collectionPath);
+                const q = query(collectionRef, limit(100));
+                const snapshot = await getDocs(q);
+                console.log(`[${timestamp}] Simple count result:`, snapshot.size);
+                return snapshot.size;
+              } catch (simpleError) {
+                console.error(`[${timestamp}] ❌ Simple count failed:`, simpleError);
+                return 0;
+              }
+            }
+          })();
+
+          const timeoutPromise = new Promise<number>((_, reject) =>
+            setTimeout(() => reject(new Error(`Query timeout for ${collectionPath}`)), 15000)
+          );
+
+          try {
+            return await Promise.race<number>([queryPromise, timeoutPromise]);
+          } catch (raceError) {
+            console.error(`[${new Date().toISOString()}] Error in Promise.race:`, raceError);
+            return 0; // Return 0 if there's an error
+          }
         } catch (error) {
-          console.error(`Error getting count for ${collectionPath}:`, error);
-          return 0; // Return 0 if collection doesn't exist or other error
+          console.error(`[${new Date().toISOString()}] Error in safeGetCount for ${collectionPath}:`, error);
+          // Return 0 for any error to prevent breaking the UI
+          return 0;
         }
       };
-      
+
       // Get all data in parallel with error handling for each query
       console.log('Fetching statistics with date range:', {
         now: now.toISOString(),
@@ -154,82 +226,65 @@ export default function AdminPage() {
       });
 
       const results = await Promise.allSettled([
-        // 1. Total users
-        safeGetCount('users').catch(e => {
-          console.error('Error fetching total users:', e);
-          throw e;
-        }),
-        
-        // 2. Active users (last 30 days)
+        // 1. Total users - safe query
+        safeGetCount('users', true),
+
+        // 2. Active users (last 30 days) - safe query
         (async () => {
           try {
             const timestamp = toFirestoreTimestamp(thirtyDaysAgo);
-            console.log('Fetching active users with lastActive >=', timestamp, '(', thirtyDaysAgo.toISOString(), ')');
-            const count = await safeGetCount(
-              'users', 
+            console.log('Fetching active users with lastActive >=', timestamp);
+            return await safeGetCount(
+              'users',
+              true,
               where('lastActive', '>=', timestamp)
             );
-            console.log('Active users count:', count);
-            return count;
           } catch (e) {
             console.error('Error in active users query:', e);
-            throw e;
+            return 0;
           }
         })(),
-        
-        // 3. New users (last 7 days)
+
+        // 3. New users (last 7 days) - safe query
         safeGetCount(
-          'users', 
+          'users',
+          true,
           where('createdAt', '>=', toFirestoreTimestamp(sevenDaysAgo))
-        ).catch(e => {
-          console.error('Error fetching new users:', e);
-          throw e;
-        }),
-        
-        // 4. Total transactions
+        ),
+
+        // 4. Total transactions count and value - OPTIMIZED: avoid fetching all documents
         (async () => {
           try {
-            console.log('Fetching total transactions...');
-            const count = await safeGetCount('transactions');
-            console.log('Total transactions count:', count);
-            return count;
+            const transactionsRef = collection(db, 'transactions');
+            const transactionsQuery = query(transactionsRef);
+            const transactionsSnapshot = await getCountFromServer(transactionsQuery);
+            const transactionCount = transactionsSnapshot.data().count;
+
+            // OPTIMIZATION: Instead of fetching ALL transactions, use a more efficient approach
+            // For now, return count only and calculate value separately if needed
+            // This prevents loading thousands of documents just for a sum
+            return { count: transactionCount, value: 0 }; // Placeholder for value
           } catch (e) {
-            console.error('Error in transactions query:', e);
-            // Try to get more details about the error
-            if (e instanceof Error) {
-              console.error('Error details:', {
-                message: e.message,
-                name: e.name,
-                stack: e.stack
-              });
-            }
-            throw e;
+            console.error('Error calculating transaction stats:', e);
+            return { count: 0, value: 0 };
           }
         })(),
-        
-        // 5. Total contact messages
-        safeGetCount('contactMessages').catch(e => {
-          console.error('Error fetching total messages:', e);
-          throw e;
-        }),
-        
-        // 6. New messages (last 7 days, unread or new)
+
+        // 5. Total contact messages - safe query
+        safeGetCount('contactMessages', true),
+
+        // 6. New messages (last 7 days, unread or new) - safe query
         safeGetCount(
           'contactMessages',
+          true,
           where('createdAt', '>=', toFirestoreTimestamp(sevenDaysAgo)),
           where('status', 'in', ['unread', 'new'])
-        ).catch(e => {
-          console.error('Error fetching new messages:', e);
-          throw e;
-        }),
-        
-        // 7. Total cards
-        safeGetCount('cards').catch(e => {
-          console.error('Error fetching total cards:', e);
-          throw e;
-        })
+        ),
+
+        // 7. Total cards - safe query
+        safeGetCount('cards', true)
       ]);
-      
+
       // Extract values from results with detailed error logging
       const extractResult = (index: number, name: string) => {
         const result = results[index];
@@ -242,20 +297,27 @@ export default function AdminPage() {
         }
       };
 
-      const totalUsers = extractResult(0, 'totalUsers');
-      const activeUsers = extractResult(1, 'activeUsers');
-      const newUsers = extractResult(2, 'newUsers');
-      const totalTransactions = extractResult(3, 'totalTransactions');
-      const totalMessages = extractResult(4, 'totalMessages');
-      const newMessages = extractResult(5, 'newMessages');
-      const totalCards = extractResult(6, 'totalCards');
-      
+      // Clear the timeout since we got results
+      clearTimeout(timeoutId);
+      clearTimeout(safetyTimeout);
+      setLoadingTimeout(false);
+
+      const totalUsers = extractResult(0, 'totalUsers') as number;
+      const activeUsers = extractResult(1, 'activeUsers') as number;
+      const newUsers = extractResult(2, 'newUsers') as number;
+      const transactionStats = extractResult(3, 'transactionStats') as { count: number; value: number };
+      const totalTransactions = transactionStats?.count || 0;
+      const totalTransactionValue = transactionStats?.value || 0;
+      const totalMessages = extractResult(4, 'totalMessages') as number;
+      const newMessages = extractResult(5, 'newMessages') as number;
+      const totalCards = extractResult(6, 'totalCards') as number;
+
       // Calculate storage usage (placeholder)
-      const storageUsed = 'Calculating...';
-      
+      const storageUsed = loadingTimeout ? 'Loading timeout - data unavailable' : 'Calculating...';
+
       // Get system health status
       const systemHealth = await checkSystemHealth();
-      
+
       console.log('Stats loaded:', {
         totalUsers,
         totalCards,
@@ -266,14 +328,15 @@ export default function AdminPage() {
         newUsers,
         storageUsed
       });
-      
+
       setStats({
         totalUsers,
         totalCards,
         totalTransactions,
+        totalTransactionValue,
         totalMessages,
         newMessages,
-        systemHealth: systemHealth ? 'operational' : 'degraded',
+        systemHealth: loadingTimeout ? 'degraded' : (systemHealth ? 'operational' : 'degraded'),
         activeUsers,
         newUsers,
         storageUsed,
@@ -281,195 +344,103 @@ export default function AdminPage() {
       });
     } catch (error) {
       console.error('Error loading stats:', error);
-      toast.error('Failed to load dashboard data');
+      // Clear timeouts
+      clearTimeout(safetyTimeout);
+      // Show a more user-friendly error message
+      toast.error('Unable to load some statistics. This may be due to missing data or permissions.', {
+        duration: 5000,
+      });
       setStats(prev => ({
         ...prev,
         systemHealth: 'degraded',
         loading: false
       }));
     }
-  }, []);
+  }, [checkSystemHealth, user, isAdmin, loadingTimeout]);
 
-  // Tab content
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'status':
-        return <StatusPage />;
-      case 'users':
-        return <div>Users Management</div>;
-      case 'transactions':
-        return <div>Transactions Management</div>;
-      case 'messages':
-        return (
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Mail className="h-6 w-6 text-amber-400" />
-              <h2 className="text-2xl font-serif text-slate-100">Contact Messages</h2>
-            </div>
-            <ContactMessages />
-          </div>
-        );
-      case 'settings':
-        return <div>System Settings</div>;
-      default:
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Quick Actions */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Quick action buttons */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-slate-100 mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <button 
-                    onClick={() => setActiveTab('status')}
-                    className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <Server className="h-6 w-6 mx-auto mb-2 text-blue-400" />
-                    <span className="text-sm">Status</span>
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('users')}
-                    className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <Users className="h-6 w-6 mx-auto mb-2 text-blue-400" />
-                    <span className="text-sm">Manage Users</span>
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('transactions')}
-                    className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <CreditCard className="h-6 w-6 mx-auto mb-2 text-amber-400" />
-                    <span className="text-sm">View Transactions</span>
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('messages')}
-                    className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <MessageSquare className="h-6 w-6 mx-auto mb-2 text-purple-400" />
-                    <span className="text-sm">View Messages</span>
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('settings')}
-                    className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <Settings className="h-6 w-6 mx-auto mb-2 text-green-400" />
-                    <span className="text-sm">Settings</span>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Recent Transactions Table */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-slate-100 mb-4">Recent Transactions</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-800">
-                    <thead>
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Description</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Amount</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      <tr>
-                        <td className="px-4 py-3 text-sm text-slate-300">Just now</td>
-                        <td className="px-4 py-3 text-sm text-slate-300">Grocery Store</td>
-                        <td className="px-4 py-3 text-sm text-red-400">-$45.67</td>
-                        <td className="px-4 py-3">
-                          <span className="px-2 py-1 text-xs rounded-full bg-green-900/30 text-green-400">Completed</span>
-                        </td>
-                      </tr>
-                      {/* Add more rows as needed */}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            
-            {/* Right Column - Recent Activity */}
-            <div className="lg:col-span-1">
-              <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-                <RecentActivities />
-              </div>
-            </div>
-          </div>
-        );
-    }
-  };
-
-  // Check admin status and load data when user or authLoading changes
+  // Combined admin verification and data loading
   useEffect(() => {
+    if (authLoading) return;
+
     let isMounted = true;
     let intervalId: NodeJS.Timeout | null = null;
 
-    const verifyAdminAccess = async () => {
-      if (authLoading) return;
-      
+    // Hard fallback to prevent permanent loading state
+    const hardFallbackTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn('🚨 HARD FALLBACK: Forcing loading state to false after 45 seconds');
+        setStats(prev => ({ ...prev, loading: false }));
+        setLoadingTimeout(true);
+        toast.error('Loading took too long. Some data may not be available.', { duration: 5000 });
+      }
+    }, 45000); // 45 second hard fallback
+
+    const initializeAdminPage = async () => {
       if (!user) {
         router.push('/login');
         return;
       }
-      
+
       try {
-        console.log('Verifying admin access for:', user.email);
-        const isUserAdmin = user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-        console.log('Is user admin?', isUserAdmin);
-        
+        // Quick admin check
+        const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+        const isUserAdmin = user.email ? adminEmails.includes(user.email) : false;
+
         if (!isMounted) return;
-        
+
         setIsAdmin(isUserAdmin);
         setCheckingAdmin(false);
-        
+
         if (!isUserAdmin) {
-          console.log('User is not an admin, redirecting to dashboard');
-          router.push('/dashboard');
+          clearTimeout(hardFallbackTimeout);
+          toast.error('Admin access required. Please contact support if you believe this is an error.', {
+            duration: 5000,
+          });
+          setTimeout(() => {
+            if (isMounted) {
+              router.push('/dashboard');
+            }
+          }, 1000);
           return;
         }
-        
-        // Only load stats if user is admin
-        console.log('User is admin, loading stats...');
-        
-        const loadData = async () => {
-          try {
-            if (isMounted) {
+
+        // Load stats immediately for admin users
+        console.log('✅ Admin access granted, loading stats...');
+        await loadStats();
+        clearTimeout(hardFallbackTimeout); // Clear fallback if load succeeds
+
+        // Set up refresh interval
+        intervalId = setInterval(async () => {
+          if (isMounted) {
+            try {
               await loadStats();
-            }
-          } catch (error) {
-            console.error('Error loading stats:', error);
-            if (isMounted) {
-              toast.error('Failed to load admin statistics');
+            } catch (error) {
+              console.error('Error refreshing stats:', error);
             }
           }
-        };
-        
-        // Initial load
-        loadData();
-        
-        // Set up refresh interval (only if not already set)
-        if (!intervalId) {
-          intervalId = setInterval(loadData, 5 * 60 * 1000); // Refresh every 5 minutes
-        }
-        
+        }, 2 * 60 * 1000); // Refresh every 2 minutes
+
       } catch (error) {
-        console.error('Error verifying admin status:', error);
+        clearTimeout(hardFallbackTimeout);
+        console.error('❌ Error initializing admin page:', error);
         if (isMounted) {
           setCheckingAdmin(false);
-          toast.error('Error verifying admin access');
+          toast.error('Error initializing admin page');
         }
       }
     };
-    
-    verifyAdminAccess();
-    
+
+    initializeAdminPage();
+
     // Cleanup function
     return () => {
       isMounted = false;
+      clearTimeout(hardFallbackTimeout);
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
-  }, [user, authLoading, router, loadStats]);
+  }, [authLoading, user, router, loadStats]);
 
   if (authLoading || checkingAdmin) {
     return (
@@ -496,32 +467,25 @@ export default function AdminPage() {
             <h3 className="text-lg font-medium text-slate-100 mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <button 
-                onClick={() => setActiveTab('users')}
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <Users className="h-6 w-6 mx-auto mb-2 text-blue-400" />
-                <span className="text-sm">Manage Users</span>
-              </button>
-              <button 
-                className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                onClick={() => setActiveTab('transactions')}
+                onClick={() => router.push('/dashboard')}
               >
                 <CreditCard className="h-6 w-6 mx-auto mb-2 text-amber-400" />
-                <span className="text-sm">View Transactions</span>
+                <span className="text-sm">My Transactions</span>
               </button>
               <button 
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                onClick={() => setActiveTab('messages')}
+                onClick={() => router.push('/login')}
               >
                 <MessageSquare className="h-6 w-6 mx-auto mb-2 text-purple-400" />
-                <span className="text-sm">View Messages</span>
+                <span className="text-sm">Contact Support</span>
               </button>
               <button 
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
-                onClick={() => setActiveTab('settings')}
+                onClick={() => router.push('/dashboard')}
               >
                 <Settings className="h-6 w-6 mx-auto mb-2 text-green-400" />
-                <span className="text-sm">Settings</span>
+                <span className="text-sm">Account Settings</span>
               </button>
             </div>
           </div>
@@ -565,48 +529,26 @@ export default function AdminPage() {
     );
   }
 
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-amber-400">Admin Dashboard</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-slate-400">{user?.email}</span>
-            <button
-              onClick={loadStats}
-              disabled={stats.loading}
-              className={`px-3 py-1.5 text-sm rounded-md flex items-center space-x-1 transition-colors ${
-                stats.loading 
-                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-              }`}
-            >
-              {stats.loading ? (
-                <div className="animate-spin h-4 w-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                    <path d="M3 3v5h5"></path>
-                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
-                    <path d="M16 16h5v5"></path>
-                  </svg>
-                </div>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                  <path d="M3 3v5h5"></path>
-                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
-                  <path d="M16 16h5v5"></path>
-                </svg>
-              )}
-              <span>{stats.loading ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <ShieldCheckIcon className="h-6 w-6 text-amber-400" />
+            <h1 className="text-3xl font-serif text-slate-100 tracking-wide">
+              Admin Dashboard
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 font-serif tracking-wide">ADMIN</span>
           </div>
         </div>
-      </header>
-      
-      <main className="container mx-auto px-4 py-8">
+
+        {/* Dashboard Content */}
         <AdminTabs stats={stats} onRefresh={loadStats} />
-      </main>
+      </div>
     </div>
   );
 }

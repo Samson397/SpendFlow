@@ -6,16 +6,20 @@ import toast from 'react-hot-toast';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
+import { securityService } from '@/lib/securityService';
 
 interface SecurityEvent {
   id: string;
-  type: 'login' | 'failed_attempt' | 'password_change' | '2fa_enabled' | 'suspicious_activity';
-  user: string;
-  ip: string;
-  location: string;
-  device: string;
-  timestamp: string;
-  status: 'success' | 'warning' | 'error';
+  userId: string;
+  userEmail: string;
+  type: 'login' | 'logout' | 'failed_attempt' | 'password_change' | '2fa_enabled' | '2fa_disabled' | 'suspicious_activity' | 'account_locked' | 'account_unlocked';
+  ip?: string;
+  location?: string;
+  device?: string;
+  userAgent?: string;
+  success: boolean;
+  details?: string;
+  timestamp: { toDate: () => Date } | Date;
 }
 
 export default function SecurityPanel() {
@@ -42,6 +46,14 @@ export default function SecurityPanel() {
   // Calculate derived state
   const failedLoginAttempts = securityEvents.filter(e => e.type === 'failed_attempt').length;
   const securityAlerts = securityEvents.filter(e => e.status === 'warning' || e.status === 'error').length;
+  
+  // Calculate security score (0-100)
+  const securityScore = Math.max(0, Math.min(100, 
+    100 - 
+    (failedLoginAttempts * 5) - 
+    (securityAlerts * 10) - 
+    (securityEvents.length < 10 ? 20 : 0) // Penalize low activity
+  ));
 
   // Fetch security events from Firestore
   useEffect(() => {
@@ -68,13 +80,16 @@ export default function SecurityPanel() {
               const data = doc.data();
               return {
                 id: doc.id,
+                userId: data.userId,
+                userEmail: data.userEmail,
                 type: data.type || 'login',
-                user: data.userEmail || 'Unknown',
-                ip: data.ip || 'Unknown',
-                location: data.location || 'Unknown',
+                ip: data.ip,
+                location: data.location,
                 device: data.device || 'Unknown',
-                timestamp: data.timestamp?.toDate().toISOString() || new Date().toISOString(),
-                status: data.status || 'warning'
+                userAgent: data.userAgent,
+                success: data.success ?? true,
+                details: data.details,
+                timestamp: data.timestamp?.toDate() || new Date(),
               } as SecurityEvent;
             });
             
@@ -108,7 +123,21 @@ export default function SecurityPanel() {
     };
   }, [user]);
 
-  const securityScore = 92; // Out of 100
+  const generateSampleEvents = async () => {
+    if (!user) return;
+
+    try {
+      // Generate some sample security events
+      await securityService.logLogin(user.uid, user.email || 'unknown');
+      await securityService.logFailedLogin('test@example.com', 'Invalid password');
+      await securityService.logSuspiciousActivity(user.uid, user.email || 'unknown', 'Multiple failed login attempts');
+      
+      toast.success('Sample security events generated');
+    } catch (error) {
+      console.error('Error generating sample events:', error);
+      toast.error('Failed to generate sample events');
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -124,21 +153,21 @@ export default function SecurityPanel() {
   };
 
   const getEventTypeIcon = (type: string) => {
-    const iconProps = { className: 'h-4 w-4', 'aria-hidden': 'true' };
+    const baseClass = 'h-4 w-4';
     
     switch (type) {
       case 'login':
-        return <User {...iconProps} className={`${iconProps.className} text-blue-500`} />;
+        return <User className={`${baseClass} text-blue-500`} aria-hidden="true" />;
       case 'failed_attempt':
-        return <X {...iconProps} className={`${iconProps.className} text-red-500`} />;
+        return <X className={`${baseClass} text-red-500`} aria-hidden="true" />;
       case 'password_change':
-        return <Shield {...iconProps} className={`${iconProps.className} text-purple-500`} />;
+        return <Shield className={`${baseClass} text-purple-500`} aria-hidden="true" />;
       case '2fa_enabled':
-        return <Shield {...iconProps} className={`${iconProps.className} text-green-500`} />;
+        return <Shield className={`${baseClass} text-green-500`} aria-hidden="true" />;
       case 'suspicious_activity':
-        return <ShieldAlert {...iconProps} className={`${iconProps.className} text-amber-500`} />;
+        return <ShieldAlert className={`${baseClass} text-amber-500`} aria-hidden="true" />;
       default:
-        return <Shield {...iconProps} className={`${iconProps.className} text-slate-400`} />;
+        return <Shield className={`${baseClass} text-slate-400`} aria-hidden="true" />;
     }
   };
 
@@ -365,6 +394,13 @@ export default function SecurityPanel() {
                         </button>
                         <button
                           type="button"
+                          onClick={generateSampleEvents}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-blue-800 bg-blue-400 hover:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                          Generate Test Events
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setShowSuspiciousActivity(false)}
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-amber-200 bg-amber-900/30 hover:bg-amber-800/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-600"
                         >
@@ -432,26 +468,35 @@ export default function SecurityPanel() {
                           <div className="flex justify-between">
                             <p className="text-sm font-medium text-slate-100">
                               {event.type === 'login' && 'Successful login'}
+                              {event.type === 'logout' && 'User logout'}
                               {event.type === 'failed_attempt' && 'Failed login attempt'}
                               {event.type === 'password_change' && 'Password changed'}
                               {event.type === '2fa_enabled' && 'Two-factor authentication enabled'}
+                              {event.type === '2fa_disabled' && 'Two-factor authentication disabled'}
                               {event.type === 'suspicious_activity' && 'Suspicious activity detected'}
+                              {event.type === 'account_locked' && 'Account locked'}
+                              {event.type === 'account_unlocked' && 'Account unlocked'}
                             </p>
                             <div className="flex items-center">
                               <span className="text-xs text-slate-500">
                                 {formatDate(event.timestamp)}
                               </span>
                               <span className="ml-2">
-                                {getStatusIcon(event.status)}
+                                {getStatusIcon(event.success ? 'success' : event.type === 'failed_attempt' ? 'error' : 'warning')}
                               </span>
                             </div>
                           </div>
                           <p className="text-sm text-slate-400 mt-1">
-                            <span className="font-medium">{event.user}</span> • {event.device}
+                            <span className="font-medium">{event.userEmail}</span> • {event.device}
                           </p>
+                          {event.details && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {event.details}
+                            </p>
+                          )}
                           <div className="mt-1 flex items-center text-xs text-slate-500">
                             <Globe className="h-3 w-3 mr-1" />
-                            {event.ip} • {event.location}
+                            {event.ip || 'Unknown IP'} • {event.location || 'Unknown location'}
                           </div>
                         </div>
                       </div>
@@ -603,16 +648,19 @@ export default function SecurityPanel() {
                         <div className="ml-3">
                           <p className="text-sm font-medium text-slate-100">
                             {event.type === 'login' && 'Successful login'}
+                            {event.type === 'logout' && 'User logout'}
                             {event.type === 'failed_attempt' && 'Failed login attempt'}
                             {event.type === 'password_change' && 'Password changed'}
                             {event.type === '2fa_enabled' && '2FA enabled'}
                             {event.type === 'suspicious_activity' && 'Suspicious activity'}
+                            {event.type === 'account_locked' && 'Account locked'}
+                            {event.type === 'account_unlocked' && 'Account unlocked'}
                           </p>
                           <p className="text-xs text-slate-400 mt-0.5">
                             {formatDate(event.timestamp)}
                           </p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {event.ip} • {event.device}
+                            {event.ip || 'Unknown IP'} • {event.device}
                           </p>
                         </div>
                       </div>

@@ -105,9 +105,22 @@ export const shouldShowAds = (): boolean => {
   return true;
 };
 
+// Type for ad placement configuration
+interface AdPlacementConfig {
+  enabled: boolean;
+  size?: string;
+  className?: string;
+  frequency?: number;
+  mobile?: {
+    enabled: boolean;
+    size?: string;
+    frequency?: number;
+  };
+}
+
 // Get ad configuration for a specific placement
 export const getAdPlacementConfig = (placement: string, isMobile: boolean = false) => {
-  const config = adConfig.placements[placement as keyof typeof adConfig.placements];
+  const config = adConfig.placements[placement as keyof typeof adConfig.placements] as AdPlacementConfig | undefined;
   
   if (!config) {
     console.warn(`No configuration found for ad placement: ${placement}`);
@@ -120,7 +133,7 @@ export const getAdPlacementConfig = (placement: string, isMobile: boolean = fals
       ...config,
       ...config.mobile,
       // Use mobile size if specified, otherwise fall back to desktop size
-      size: config.mobile.size || config.size
+      size: (config.mobile && 'size' in config.mobile) ? config.mobile.size : config.size
     };
   }
   

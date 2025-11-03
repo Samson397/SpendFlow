@@ -3,36 +3,62 @@
 import { useState, useEffect } from 'react';
 import AdBanner from '@/components/ads/AdBanner';
 
+// Define types
+interface Transaction {
+  id: number;
+  name: string;
+  amount: string;
+  date: string;
+  category: string;
+  description?: string;
+  type?: string;
+  isAd?: never;
+}
+
+interface Ad {
+  id: string;
+  isAd: true;
+}
+
+type ContentItem = Transaction | Ad;
+
 // Mock transaction data
-const generateMockTransactions = (count: number) => {
+const generateMockTransactions = (count: number): Transaction[] => {
+  const categories = ['Food', 'Shopping', 'Bills', 'Transportation', 'Entertainment'];
+  const names = ['Grocery Store', 'Coffee Shop', 'Restaurant', 'Online Shopping', 'Gas Station', 'Utility Bill', 'Phone Bill', 'Entertainment'];
+  const types = ['expense', 'income'];
+  
   return Array(count).fill(null).map((_, i) => ({
     id: i + 1,
-    name: ['Grocery Store', 'Coffee Shop', 'Restaurant', 'Online Shopping', 'Gas Station', 'Utility Bill', 'Phone Bill', 'Entertainment'][i % 8],
+    name: names[i % names.length],
+    description: `Transaction ${i + 1}`,
     amount: `$${(Math.random() * 200 + 5).toFixed(2)}`,
+    type: types[Math.floor(Math.random() * types.length)],
     date: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-    category: ['Food', 'Shopping', 'Bills', 'Transportation', 'Entertainment'][Math.floor(Math.random() * 5)],
+    category: categories[Math.floor(Math.random() * categories.length)],
   }));
 };
 
 export default function AdsDemoPage() {
   const [activeTab, setActiveTab] = useState('transactions');
-  const [transactions, setTransactions] = useState<Array<any>>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Load mock data
   useEffect(() => {
-    setLoading(true);
     // Simulate API call
     const timer = setTimeout(() => {
       setTransactions(generateMockTransactions(8));
       setLoading(false);
     }, 800);
 
+    // Cleanup function
     return () => clearTimeout(timer);
   }, []);
 
+
   // Insert ad after every 3 transactions
-  const contentWithAds = [];
+  const contentWithAds: ContentItem[] = [];
   transactions.forEach((tx, index) => {
     contentWithAds.push(tx);
     if ((index + 1) % 3 === 0) {

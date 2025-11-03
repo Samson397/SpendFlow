@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
-import { useEffect, useState } from 'react';
-import { usersService } from '@/lib/firebase/firestore';
+import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { CurrencySelector } from '../currency/CurrencySelector';
+import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
 
 type NavItem = {
   name: string;
@@ -17,15 +18,24 @@ type NavItem = {
   adminOnly?: boolean;
 };
 
-const navigation: NavItem[] = [
+const userNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Transactions', href: '/transactions', icon: ReceiptPercentIcon },
   { name: 'Expenses', href: '/expenses', icon: CurrencyDollarIcon },
   { name: 'Income', href: '/income', icon: BanknotesIcon },
   { name: 'Cards', href: '/cards', icon: CreditCardIcon },
+  { name: 'Categories', href: '/categories', icon: TagIcon },
+  { name: 'Savings', href: '/savings', icon: BuildingLibraryIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
+  { name: 'Subscription', href: '/subscription', icon: SparklesIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
-  { name: 'Admin', href: '/admin', icon: ShieldCheckIcon, adminOnly: true },
+];
+
+const adminNavigation: NavItem[] = [
+  { name: 'Admin Dashboard', href: '/admin', icon: ShieldCheckIcon },
+  { name: 'User Management', href: '/admin/users', icon: UserIcon },
+  { name: 'System Alerts', href: '/admin/alerts', icon: TagIcon },
+  { name: 'Settings', href: '/admin/settings', icon: SparklesIcon },
 ];
 
 // Dynamically import AdManager with no SSR
@@ -35,23 +45,55 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
+  // Calculate admin status using useMemo to avoid setState in useEffect
+  const isAdmin = useMemo(() => {
     if (user) {
-      usersService.get(user.uid).then(profile => {
-        setIsAdmin(profile?.isAdmin || false);
+      // Use same admin check logic as AuthContext - supports multiple admins
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+      const userIsAdmin = user.email ? adminEmails.includes(user.email) : false;
+
+      console.log('Sidebar admin check:', {
+        userEmail: user.email,
+        adminEmails,
+        userIsAdmin
       });
+
+      return userIsAdmin;
     }
+    return false;
   }, [user]);
 
   const handleSignOut = async () => {
     try {
+      console.log('🔄 Starting sidebar logout process...');
+
+      // Clear local storage and session storage
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Sign out from Firebase
       await signOut(auth);
-      router.push('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
+
+      console.log('✅ Successfully signed out from sidebar');
+
+      // Force redirect to login page
+      window.location.href = '/login';
+
+    } catch (error: unknown) {
+      console.error('❌ Sidebar logout error:', error);
+
+      // Handle specific Firebase errors
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/insufficient-permission') {
+        console.warn('⚠️ Insufficient permission during sidebar logout - this may be expected');
+      }
+
+      const friendlyError = getFirebaseAuthError(error as { code?: string; message?: string });
+      console.error(`${friendlyError.title}: ${friendlyError.message}`);
+
+      // For sidebar, we don't show toast, just redirect
+      window.location.href = '/login';
     }
   };
 
@@ -60,10 +102,10 @@ export default function Sidebar() {
   };
 
   const renderNavLinks = () => {
-    return navigation.map((item) => {
-      // Hide admin link if user is not admin
-      if (item.adminOnly && !isAdmin) return null;
-      
+    // Use different navigation based on admin status
+    const currentNavigation = isAdmin ? adminNavigation : userNavigation;
+
+    const links = currentNavigation.map((item) => {
       const isActive = pathname === item.href;
       return (
         <Link
@@ -72,13 +114,13 @@ export default function Sidebar() {
           onClick={closeMobileMenu}
           className={`group flex items-center px-4 py-4 text-sm transition-all duration-200 ${
             isActive
-              ? 'border-l-2 border-amber-600 bg-amber-900/10 text-amber-400'
-              : 'border-l-2 border-transparent text-slate-400 hover:border-amber-600/50 hover:text-slate-200'
+              ? 'border-l-2 border-(--theme-accent) bg-(--theme-secondary)/10 text-(--theme-accent)'
+              : 'border-l-2 border-transparent text-slate-400 hover:border-(--theme-accent)/50 hover:text-slate-200'
           }`}
         >
           <item.icon
             className={`mr-3 shrink-0 h-5 w-5 transition-colors ${
-              isActive ? 'text-amber-400' : 'text-slate-500 group-hover:text-slate-300'
+              isActive ? 'text-(--theme-accent)' : 'text-slate-500 group-hover:text-slate-300'
             }`}
             aria-hidden="true"
           />
@@ -86,6 +128,8 @@ export default function Sidebar() {
         </Link>
       );
     });
+
+    return links;
   };
 
   return (
@@ -99,7 +143,7 @@ export default function Sidebar() {
             </div>
             <button
               onClick={closeMobileMenu}
-              className="p-1 rounded-md text-slate-400 hover:text-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="p-1 rounded-md text-slate-400 hover:text-(--theme-accent) focus:outline-none focus:ring-1 focus:ring-(--theme-accent)"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
@@ -107,6 +151,25 @@ export default function Sidebar() {
           <nav className="flex-1 overflow-y-auto py-2">
             {renderNavLinks()}
           </nav>
+          {/* Mobile Footer - Currency & Logout */}
+          <div className="border-t border-slate-800 p-4 space-y-4">
+            {/* Currency Selector */}
+            <div>
+              <p className="text-xs text-slate-500 mb-2 font-serif tracking-wider">CURRENCY</p>
+              <CurrencySelector />
+            </div>
+            {/* Sign Out Button */}
+            <button
+              onClick={() => {
+                handleSignOut();
+                closeMobileMenu();
+              }}
+              className="group flex w-full items-center px-4 py-4 text-sm text-slate-400 hover:text-slate-200 transition-colors border-t border-slate-700 pt-4"
+            >
+              <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-500 group-hover:text-slate-300" />
+              <span className="tracking-wide uppercase text-xs font-serif">Sign out</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -114,12 +177,6 @@ export default function Sidebar() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-amber-900/30">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1 rounded-md text-slate-400 hover:text-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            >
-              <Bars3Icon className="h-6 w-6" />
-            </button>
             <h1 className="text-lg font-serif text-slate-100 tracking-widest">
               SPENDFLOW
             </h1>
@@ -141,11 +198,11 @@ export default function Sidebar() {
       <div className="hidden md:flex md:shrink-0">
         <div className="flex flex-col w-64 border-r border-slate-800 bg-slate-900/50">
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex flex-col items-center justify-center h-24 shrink-0 px-4 bg-gradient-to-r from-slate-800/50 to-slate-900/50">
+            <div className="flex flex-col items-center justify-center h-24 shrink-0 px-4 bg-linear-to-r from-slate-800/50 to-slate-900/50">
               <h1 className="text-xl font-serif text-slate-100 tracking-widest">
                 SPENDFLOW
               </h1>
-              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-600 to-transparent mt-3"></div>
+              <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-(--theme-accent) to-transparent mt-3"></div>
             </div>
             <div className="flex flex-col grow mt-5">
               <nav className="flex-1 px-2 space-y-1">
@@ -154,25 +211,25 @@ export default function Sidebar() {
             </div>
             <div className="shrink-0 p-4 border-t border-slate-600 space-y-3">
               {/* Currency Selector */}
-              <div className="mt-auto space-y-4">
-                {/* Ad - Desktop only */}
-                <div className="hidden md:block p-2 rounded-lg bg-slate-800/50">
-                  <p className="text-xs text-slate-400 mb-1 text-center">Advertisement</p>
-                  <AdManager adUnit="SIDEBAR" className="rounded overflow-hidden" />
-                </div>
-                
-                <div className="pt-2 border-t border-slate-700">
-                  <div className="px-2 space-y-1">
-                    <button
-                      onClick={handleSignOut}
-                      className="group flex items-center w-full px-2 py-2 text-sm font-medium rounded-md text-slate-300 hover:bg-slate-800 hover:text-white"
-                    >
-                      <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-400 group-hover:text-slate-300" />
-                      Sign out
-                    </button>
-                  </div>
+              <div className="px-2 py-3">
+                <p className="text-xs text-slate-500 mb-2 font-serif tracking-wider">CURRENCY</p>
+                <div className="mb-4">
+                  <CurrencySelector />
                 </div>
               </div>
+              {/* Ad - Desktop only */}
+              <div className="hidden md:block p-2 rounded-lg bg-slate-800/50">
+                <p className="text-xs text-slate-400 mb-1 text-center">Advertisement</p>
+                <AdManager adUnit="SIDEBAR" className="rounded overflow-hidden" />
+              </div>
+              {/* Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                className="group flex w-full items-center px-4 py-4 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-500 group-hover:text-slate-300" />
+                <span className="tracking-wide uppercase text-xs font-serif">Sign out</span>
+              </button>
             </div>
           </div>
         </div>

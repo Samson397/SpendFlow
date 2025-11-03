@@ -50,10 +50,14 @@ export default function RecentActivities() {
       try {
         setLoading(true);
         setError(null);
+        console.log('🔄 [RecentActivities] Loading activities...');
+
         const recentActivities = await getRecentActivities(10);
-        
+        console.log('✅ [RecentActivities] Loaded activities:', recentActivities.length);
+
         if (recentActivities.length === 0) {
           // If no activities found, add a welcome message
+          console.log('ℹ️ [RecentActivities] No activities found, showing welcome message');
           setActivities([{
             id: 'welcome-activity',
             type: 'system',
@@ -68,41 +72,59 @@ export default function RecentActivities() {
           setActivities(recentActivities);
         }
       } catch (error) {
-        console.error('Error loading activities:', error);
-        setError('Failed to load activities. Please try again later.');
+        console.error('❌ [RecentActivities] Error loading activities:', error);
+        setError('Failed to load activities. The activities feature may not be enabled yet.');
+        // Show welcome message even on error
+        setActivities([{
+          id: 'welcome-activity',
+          type: 'system',
+          action: 'welcome_message',
+          timestamp: new Date(),
+          metadata: {
+            message: 'Recent Activity feature is being initialized...',
+            action: 'System initializing'
+          }
+        }]);
       } finally {
         setLoading(false);
       }
     };
 
     loadActivities();
-    
-    // Set up real-time updates
-    const q = query(
-      collection(db, 'activities'),
-      orderBy('timestamp', 'desc'),
-      limit(10)
-    );
-    
-    const unsubscribe = onSnapshot(q, 
-      (snapshot: { docs: QueryDocumentSnapshot<DocumentData, DocumentData>[] }) => {
-        const updatedActivities = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            timestamp: data.timestamp?.toDate()
-          } as Activity;
-        });
-        setActivities(updatedActivities);
-      }, 
-      (error: Error) => {
-        console.error('Error setting up real-time updates:', error);
-        setError('Real-time updates unavailable. Some data may be outdated.');
-      }
-    );
-    
-    return () => unsubscribe();
+
+    // Set up real-time updates (only if Firestore is working)
+    try {
+      const q = query(
+        collection(db, 'activities'),
+        orderBy('timestamp', 'desc'),
+        limit(10)
+      );
+
+      const unsubscribe = onSnapshot(q,
+        (snapshot: { docs: QueryDocumentSnapshot<DocumentData, DocumentData>[] }) => {
+          console.log('🔄 [RecentActivities] Real-time update received:', snapshot.docs.length, 'activities');
+          const updatedActivities = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              timestamp: data.timestamp?.toDate()
+            } as Activity;
+          });
+          setActivities(updatedActivities);
+        },
+        (error: Error) => {
+          console.error('❌ [RecentActivities] Real-time updates error:', error);
+          // Don't set error state for real-time failures, just log it
+          console.warn('⚠️ [RecentActivities] Real-time updates unavailable, but component will still work');
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.warn('⚠️ [RecentActivities] Could not set up real-time updates:', error);
+      return () => {}; // No cleanup needed
+    }
   }, []);
 
   if (loading) {
@@ -129,16 +151,10 @@ export default function RecentActivities() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-medium text-slate-400">Recent Activity</h3>
-          <span className="text-xs text-red-400">Connection error</span>
+          <span className="text-xs text-amber-400">Feature initializing</span>
         </div>
-        <div className="p-4 rounded-lg bg-red-900/20 border border-red-800/50 text-sm text-red-200">
-          <p>{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-2 text-xs bg-red-900/50 hover:bg-red-800/50 text-red-100 px-3 py-1 rounded-md"
-          >
-            Retry
-          </button>
+        <div className="p-4 rounded-lg bg-amber-900/20 border border-amber-800/50 text-sm text-amber-200">
+          <p>The Recent Activity feature is being set up. Activities will appear here once the system is fully configured.</p>
         </div>
       </div>
     );

@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usersService } from '@/lib/firebase/firestore';
-import { onValue, ref, getDatabase } from 'firebase/database';
-import { setupPresence } from '@/lib/firebase/presence';
+import { monitorAllUsersStatus } from '@/lib/firebase/presence';
 import { toast } from 'react-hot-toast';
-import { Search, Filter, Clock, Eye, Edit, User, UserCheck, UserX, Shield, Trash2 } from 'lucide-react';
+import { Search, Filter, Clock, Eye, User, UserCheck, UserX, Shield, Crown, Star } from 'lucide-react';
 import { UserProfile } from '@/types';
+import { alertsService } from '@/lib/alerts';
+import { subscriptionService } from '@/lib/services/subscriptionService';
 
 // Helper function to format time ago
 const getTimeAgo = (dateString?: string | Date) => {
@@ -34,70 +35,108 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
+  const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean | undefined>>({});
+  const [presenceInitialized, setPresenceInitialized] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [verificationFilter, setVerificationFilter] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
 
+  // Set up status monitoring (presence is now handled globally in AuthContext)
   useEffect(() => {
-    console.log('🔄 [UserManagement] Initializing...');
-    loadUsers();
-    
-    let presenceCleanup: (() => void) | undefined;
-    let statusUnsubscribe: (() => void) | undefined = undefined;
-    
-    // Set up presence for current user
-    if (currentUser?.uid) {
-      console.log('👤 [UserManagement] Setting up presence for current user:', currentUser.uid);
-      presenceCleanup = setupPresence(currentUser.uid);
-    } else {
-      console.warn('⚠️ [UserManagement] No current user found');
-    }
-    
-    // Set up real-time status listener
-    const db = getDatabase();
-    const statusRef = ref(db, 'status');
-    
-    console.log('👂 [UserManagement] Setting up status listener');
-    statusUnsubscribe = onValue(statusRef, (snapshot) => {
-      console.log('📡 [UserManagement] Status update received');
-      if (snapshot.exists()) {
-        const statusData = snapshot.val();
-        const statusMap: Record<string, boolean> = {};
+    console.log('🔄 [UserManagement] Setting up status monitoring...');
+
+    // Now that RTDB is enabled, try RTDB presence monitoring
+    const setupPresenceMonitoring = async () => {
+      try {
+        console.log('🔍 [UserManagement] Starting RTDB presence monitoring setup...');
         
-        console.log('📊 [UserManagement] Raw status data:', statusData);
-        
-        Object.entries(statusData).forEach(([userId, status]) => {
-          if (status && typeof status === 'object' && 'state' in status) {
-            statusMap[userId] = status.state === 'online';
-            console.log(`👤 [UserManagement] User ${userId} is ${status.state}`);
+        // First try RTDB presence
+        const cleanupMonitor = monitorAllUsersStatus(
+          (userId, status) => {
+            console.log(`👥 [UserManagement] RTDB Status update received - User ${userId}:`, status);
+            const isOnline = status.state === 'online' && (Date.now() - status.last_changed) < (30 * 60 * 1000); // 30 min threshold
+            
+            console.log(`👥 [UserManagement] User ${userId} online status:`, isOnline, `(time diff: ${(Date.now() - status.last_changed) / 1000}s)`);
+            
+            setOnlineStatus(_prev => ({
+              ..._prev,
+              [userId]: isOnline
+            }));
+          },
+          (error) => {
+            console.error('❌ [UserManagement] RTDB presence monitoring ERROR:', error);
+            console.warn('⚠️ [UserManagement] RTDB presence failed, showing all users as unknown:', error);
+            // Set all users to unknown status
+            setOnlineStatus(prev => {
+              const unknownStatus: Record<string, boolean | undefined> = {};
+              users.forEach(user => {
+                unknownStatus[user.uid] = undefined;
+              });
+              return unknownStatus;
+            });
           }
+        );
+
+        console.log('✅ [UserManagement] RTDB presence monitoring setup completed');
+        return cleanupMonitor;
+      } catch (error) {
+        console.error('❌ [UserManagement] RTDB presence setup failed:', error);
+        console.warn('⚠️ [UserManagement] RTDB not available, showing unknown status:', error);
+        // Set all users to unknown status
+        setOnlineStatus(_prev => {
+          const unknownStatus: Record<string, boolean | undefined> = {};
+          users.forEach(user => {
+            unknownStatus[user.uid] = undefined;
+          });
+          return unknownStatus;
         });
-        
-        console.log('🔄 [UserManagement] Updating online status state');
-        setOnlineStatus(statusMap);
-      } else {
-        console.log('ℹ️ [UserManagement] No status data available');
-      }
-    }, (error) => {
-      console.error('❌ [UserManagement] Error in status listener:', error);
-      console.error(' [UserManagement] Error in status listener:', error);
-    });
-    
-    return () => {
-      console.log('🧹 [UserManagement] Cleaning up...');
-      if (presenceCleanup) {
-        console.log('🧹 [UserManagement] Cleaning up presence');
-        presenceCleanup();
-      }
-      if (statusUnsubscribe) {
-        console.log('🧹 [UserManagement] Cleaning up status listener');
-        statusUnsubscribe();
+        return () => {};
       }
     };
-  }, [currentUser]);
+
+    const initializePresence = async () => {
+      const cleanup = await setupPresenceMonitoring();
+      setPresenceInitialized(true);
+      return cleanup;
+    };
+
+    const cleanupPromise = initializePresence();
+
+    // Cleanup function - handle the promise
+    return () => {
+      cleanupPromise.then(cleanup => {
+        console.log('🧹 [UserManagement] Cleaning up status monitor');
+        cleanup();
+      });
+    };
+  }, [users]); // Include users in dependencies
+  
+  // Load users when component mounts and when presence is initialized
+  useEffect(() => {
+    if (presenceInitialized) {
+      console.log('🔄 [UserManagement] Presence initialized, loading users...');
+      loadUsers();
+    }
+  }, [presenceInitialized]);
+  
+  // Add this to help with debugging
+  useEffect(() => {
+    console.log('👀 [UserManagement] Online status updated:', Object.keys(onlineStatus).length, 'users');
+  }, [onlineStatus]);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
+      console.log('🔍 [UserManagement] Loading users...');
       const allUsers = await usersService.getAll();
+      console.log('👥 [UserManagement] Loaded users:', allUsers.map(u => ({
+        id: u.id,
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName
+      })));
+
       setUsers(allUsers);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -107,10 +146,48 @@ export default function UserManagement() {
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter(user => 
+      user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .filter(user => 
+      statusFilter === 'all' || 
+      (statusFilter === 'active' && !user.disabled) ||
+      (statusFilter === 'inactive' && user.disabled)
+    )
+    .filter(user => 
+      verificationFilter === 'all' ||
+      (verificationFilter === 'verified' && user.emailVerified) ||
+      (verificationFilter === 'unverified' && !user.emailVerified)
+    )
+    .filter(user => 
+      roleFilter === 'all' ||
+      (roleFilter === 'admin' && user.isAdmin) ||
+      (roleFilter === 'user' && !user.isAdmin)
+    );
+
+  const toggleUserRole = async (userId: string, isAdmin: boolean) => {
+    try {
+      await usersService.update(userId, { isAdmin: !isAdmin });
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, isAdmin: !isAdmin } : user
+      ));
+      
+      const action = !isAdmin ? 'Promoted user to admin' : 'Demoted user to regular user';
+      toast.success(`${action} successfully`);
+      
+      // Generate admin action alert
+      try {
+        await alertsService.adminAction(currentUser?.email || 'Unknown Admin', action, userId);
+      } catch (alertError) {
+        console.warn('Failed to create role change alert:', alertError);
+      }
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast.error('Failed to update user role');
+    }
+  };
 
   const toggleUserStatus = async (userId: string, isActive: boolean) => {
     try {
@@ -119,9 +196,116 @@ export default function UserManagement() {
         user.id === userId ? { ...user, disabled: !isActive } : user
       ));
       toast.success(`User ${isActive ? 'activated' : 'deactivated'} successfully`);
+      
+      // Generate admin action alert
+      try {
+        const action = isActive ? 'Deactivated user account' : 'Activated user account';
+        await alertsService.adminAction(currentUser?.email || 'Unknown Admin', action, userId);
+      } catch (alertError) {
+        console.warn('Failed to create status change alert:', alertError);
+      }
     } catch (error) {
       console.error('Error updating user status:', error);
       toast.error('Failed to update user status');
+    }
+  };
+
+  const updateUserSubscription = async (userId: string, newTier: 'free' | 'pro' | 'enterprise') => {
+    console.log('🔄 [updateUserSubscription] Starting update:', { userId, newTier, selectedUser });
+
+    try {
+      console.log('📝 [updateUserSubscription] Getting plans...');
+      // Get plans to find the correct plan for the tier
+      const plans = await subscriptionService.getPlans();
+      const targetPlan = plans.find(p => p.tier === newTier);
+
+      if (!targetPlan) {
+        throw new Error(`Plan not found for tier: ${newTier}`);
+      }
+
+      console.log('📝 [updateUserSubscription] Found target plan:', targetPlan.id, targetPlan.tier);
+
+      // Check if user already has a subscription
+      const existingSubscription = await subscriptionService.getUserSubscription(userId);
+      console.log('📝 [updateUserSubscription] Existing subscription:', existingSubscription?.id, existingSubscription?.status);
+
+      if (existingSubscription) {
+        // Update existing subscription
+        console.log('📝 [updateUserSubscription] Updating existing subscription...');
+        await subscriptionService.updateSubscription(userId, existingSubscription.id, {
+          planId: targetPlan.id
+        });
+      } else {
+        // Create new subscription
+        console.log('📝 [updateUserSubscription] Creating new subscription...');
+        await subscriptionService.createSubscription(userId, { planId: targetPlan.id });
+      }
+
+      // Also update user profile for consistency
+      console.log('📝 [updateUserSubscription] Updating user profile...');
+      await usersService.updateTier(userId, newTier);
+
+      console.log('✅ [updateUserSubscription] Database update successful');
+
+      console.log('🔄 [updateUserSubscription] Updating local state...');
+      setUsers(users.map(user => {
+        if (user.id === userId) {
+          // Update both subscription tier and features based on the new tier
+          const features = {
+            free: { maxCards: 2, maxTransactions: 100, analytics: false, export: false, prioritySupport: false },
+            pro: { maxCards: 10, maxTransactions: 1000, analytics: true, export: true, prioritySupport: false },
+            enterprise: { maxCards: 50, maxTransactions: 10000, analytics: true, export: true, prioritySupport: true }
+          };
+
+          return {
+            ...user,
+            subscriptionTier: newTier,
+            subscription: {
+              ...user.subscription,
+              tier: newTier,
+              status: 'active',
+              updatedAt: new Date()
+            },
+            features: features[newTier]
+          };
+        }
+        return user;
+      }));
+
+      console.log('✅ [updateUserSubscription] Local state updated');
+
+      const tierNames = { free: 'Free', pro: 'Pro', enterprise: 'Enterprise' };
+      console.log('🔔 [updateUserSubscription] Showing success toast');
+      toast.success(`User subscription updated to ${tierNames[newTier]} tier`);
+
+      // If updating current user's subscription, force refresh subscription context
+      if (userId === currentUser?.uid) {
+        console.log('🔄 [updateUserSubscription] Force refreshing subscription context...');
+        try {
+          // Clear any potential cache
+          localStorage.removeItem('subscription_cache');
+          sessionStorage.removeItem('subscription_cache');
+          window.location.reload();
+        } catch (refreshError) {
+          console.warn('Could not force refresh, falling back to regular reload');
+          window.location.reload();
+        }
+      }
+
+      // Close the modal after successful update
+      setSelectedUser(null);
+
+      // Generate admin action alert
+      try {
+        await alertsService.adminAction(currentUser?.email || 'Unknown Admin', `Changed user subscription to ${tierNames[newTier]}`, userId);
+      } catch (alertError) {
+        console.warn('Failed to create subscription change alert:', alertError);
+      }
+
+      console.log('🎉 [updateUserSubscription] Update completed successfully');
+    } catch (error) {
+      console.error('❌ [updateUserSubscription] Error updating user subscription:', error);
+      toast.error('Failed to update user subscription');
     }
   };
 
@@ -131,6 +315,12 @@ export default function UserManagement() {
         <div>
           <h2 className="text-2xl font-serif text-slate-100">User Management</h2>
           <p className="text-slate-400 text-sm">Manage all registered users and their permissions</p>
+          <div className="mt-2 text-xs text-slate-500">
+            Presence: ✅ RTDB Active (Real-time presence monitoring) |
+            Online: {Object.values(onlineStatus).filter(status => status === true).length} |
+            Offline: {Object.values(onlineStatus).filter(status => status === false).length} |
+            Unknown: {Object.keys(onlineStatus).length - Object.values(onlineStatus).filter(status => status !== undefined).length}
+          </div>
         </div>
         <div className="w-full sm:w-auto flex gap-2">
           <div className="relative flex-1 sm:w-64">
@@ -143,12 +333,99 @@ export default function UserManagement() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <button className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md text-slate-300 flex items-center gap-2">
+          <button 
+            onClick={() => {
+              console.log('🔄 [UserManagement] Manual presence refresh triggered');
+              // Force a re-render by updating presenceInitialized
+              setPresenceInitialized(false);
+              setTimeout(() => setPresenceInitialized(true), 100);
+            }}
+            className="px-3 py-2 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            title="Refresh presence status"
+          >
+            🔄 Refresh Status
+          </button>
+          <button 
+            onClick={() => setShowFilter(!showFilter)}
+            className={`px-3 py-2 rounded-md text-slate-300 flex items-center gap-2 transition-colors ${
+              showFilter ? 'bg-slate-700' : 'bg-slate-800 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">Filter</span>
+            {(statusFilter !== 'all' || verificationFilter !== 'all' || roleFilter !== 'all') && (
+              <span className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-600 text-xs">
+                !
+              </span>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilter && (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Account Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Email Verification
+              </label>
+              <select
+                value={verificationFilter}
+                onChange={(e) => setVerificationFilter(e.target.value as 'all' | 'verified' | 'unverified')}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="all">All Users</option>
+                <option value="verified">Verified Only</option>
+                <option value="unverified">Unverified Only</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                User Role
+              </label>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'user')}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="all">All Roles</option>
+                <option value="admin">Admins Only</option>
+                <option value="user">Users Only</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-between items-center">
+            <span className="text-sm text-slate-400">
+              Showing {filteredUsers.length} of {users.length} users
+            </span>
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                setVerificationFilter('all');
+                setRoleFilter('all');
+              }}
+              className="text-sm text-amber-400 hover:text-amber-300"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
         {loading ? (
@@ -167,6 +444,9 @@ export default function UserManagement() {
                     Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    Subscription
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Role
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -180,18 +460,32 @@ export default function UserManagement() {
               <tbody className="divide-y divide-slate-800">
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => (
-                    <tr key={user.uid} className="hover:bg-slate-800/50">
+                    <tr key={user.uid} className={`hover:bg-slate-800/50 ${onlineStatus[user.uid] ? 'ring-1 ring-green-500/30' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0 bg-slate-800 rounded-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-amber-400" />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-slate-100">
-                              {user.displayName || 'No Name'}
+                            <div className="relative shrink-0">
+                            <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center">
+                              <User className="h-5 w-5 text-slate-300" />
                             </div>
-                            <div className="text-sm text-slate-400">{user.email}</div>
+                            <div className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-slate-800 ${
+                              onlineStatus[user.uid] === undefined ? 'bg-gray-500' : onlineStatus[user.uid] ? 'bg-green-500' : 'bg-slate-500'
+                            }`}></div>
                           </div>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm font-medium text-slate-200">
+                              {user.displayName || 'No Name'}
+                            </p>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              onlineStatus[user.uid] === undefined
+                                ? 'bg-gray-900/30 text-gray-400'
+                                : onlineStatus[user.uid] 
+                                ? 'bg-green-900/30 text-green-400' 
+                                : 'bg-slate-700/50 text-slate-400'
+                            }`}>
+                              {onlineStatus[user.uid] === undefined ? 'Unknown' : onlineStatus[user.uid] ? 'Online' : 'Offline'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-slate-400">{user.email}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -199,10 +493,10 @@ export default function UserManagement() {
                           {/* Online Status */}
                           <div className="flex items-center">
                             <div className={`h-2 w-2 rounded-full mr-2 ${
-                              onlineStatus[user.uid] ? 'bg-green-400' : 'bg-slate-500'
+                              onlineStatus[user.uid] === undefined ? 'bg-gray-500' : onlineStatus[user.uid] ? 'bg-green-400' : 'bg-slate-500'
                             }`}></div>
                             <span className="text-sm text-slate-300">
-                              {onlineStatus[user.uid] ? 'Online' : 'Offline'}
+                              {onlineStatus[user.uid] === undefined ? 'Unknown' : onlineStatus[user.uid] ? 'Online' : 'Offline'}
                             </span>
                           </div>
                           
@@ -228,8 +522,37 @@ export default function UserManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                        {/* User role would come from your user object */}
-                        User
+                        {/* Subscription Tier */}
+                        <div className="flex items-center gap-2">
+                          {(user.subscriptionTier === 'free' || !user.subscriptionTier) && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900/30 text-gray-400">
+                              <User className="h-3 w-3 mr-1" />
+                              Free
+                            </span>
+                          )}
+                          {user.subscriptionTier === 'pro' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-900/30 text-blue-400">
+                              <Star className="h-3 w-3 mr-1" />
+                              Pro
+                            </span>
+                          )}
+                          {user.subscriptionTier === 'enterprise' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400">
+                              <Crown className="h-3 w-3 mr-1" />
+                              Enterprise
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                        {/* User role */}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.isAdmin 
+                            ? 'bg-blue-900/30 text-blue-400' 
+                            : 'bg-slate-800/50 text-slate-400'
+                        }`}>
+                          {user.isAdmin ? 'Admin' : 'User'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
@@ -275,10 +598,11 @@ export default function UserManagement() {
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
-                            className="text-blue-400 hover:text-blue-300"
-                            title="Edit User"
+                            onClick={() => toggleUserRole(user.id, user.isAdmin || false)}
+                            className={user.isAdmin ? "text-blue-400 hover:text-slate-400" : "text-slate-400 hover:text-blue-400"}
+                            title={user.isAdmin ? "Demote to User" : "Promote to Admin"}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Shield className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => toggleUserStatus(user.id, !user.disabled)}
@@ -293,7 +617,7 @@ export default function UserManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                       <User className="h-12 w-12 mx-auto text-slate-600 mb-2" />
                       <p>No users found</p>
                       <p className="text-sm mt-1">Try adjusting your search or filter criteria</p>
@@ -384,20 +708,79 @@ export default function UserManagement() {
                   </div>
                   
                   <div className="bg-slate-800/50 p-4 rounded-lg">
-                    <h5 className="text-sm font-medium text-slate-400 mb-2">User Actions</h5>
+                    <h5 className="text-sm font-medium text-slate-400 mb-2">Subscription Management</h5>
                     <div className="space-y-2">
-                      <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Profile
-                      </button>
-                      <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
-                        <Shield className="h-4 w-4 mr-2" />
-                        Manage Roles
-                      </button>
-                      <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Account
-                      </button>
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-slate-300">Current Tier:</span>
+                        <div className="flex items-center gap-2">
+                          {(selectedUser.subscriptionTier === 'free' || !selectedUser.subscriptionTier) && (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-900/30 text-gray-400">
+                              <User className="h-3 w-3 mr-1" />
+                              Free
+                            </span>
+                          )}
+                          {selectedUser.subscriptionTier === 'pro' && (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-900/30 text-blue-400">
+                              <Star className="h-3 w-3 mr-1" />
+                              Pro
+                            </span>
+                          )}
+                          {selectedUser.subscriptionTier === 'enterprise' && (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-900/30 text-amber-400">
+                              <Crown className="h-3 w-3 mr-1" />
+                              Enterprise
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => {
+                            if (selectedUser) {
+                              updateUserSubscription(selectedUser.id, 'free');
+                            }
+                          }}
+                          className={`flex items-center justify-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                            (selectedUser?.subscriptionTier === 'free' || !selectedUser?.subscriptionTier)
+                              ? 'bg-gray-600 text-white border-gray-600'
+                              : 'border-gray-600 text-gray-400 hover:bg-gray-600/20'
+                          }`}
+                        >
+                          <User className="h-4 w-4 mr-1" />
+                          Free
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedUser) {
+                              updateUserSubscription(selectedUser.id, 'pro');
+                            }
+                          }}
+                          className={`flex items-center justify-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                            selectedUser?.subscriptionTier === 'pro'
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'border-blue-600 text-blue-400 hover:bg-blue-600/20'
+                          }`}
+                        >
+                          <Star className="h-4 w-4 mr-1" />
+                          Pro
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedUser) {
+                              updateUserSubscription(selectedUser.id, 'enterprise');
+                            }
+                          }}
+                          className={`flex items-center justify-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                            selectedUser?.subscriptionTier === 'enterprise'
+                              ? 'bg-amber-600 text-white border-amber-600'
+                              : 'border-amber-600 text-amber-400 hover:bg-amber-600/20'
+                          }`}
+                        >
+                          <Crown className="h-4 w-4 mr-1" />
+                          Enterprise
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

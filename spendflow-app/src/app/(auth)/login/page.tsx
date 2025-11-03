@@ -7,6 +7,8 @@ import { auth } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { AuthGate } from '@/components/auth/AuthGate';
+import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
+import { DeviceManagementService, PersistentAuthService } from '@/lib/services/deviceManagementService';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
@@ -14,6 +16,7 @@ function LoginContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(false);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -28,13 +31,38 @@ function LoginContent() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/dashboard');
+
+      // Check if user is admin and redirect accordingly
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+
+      // Get current user after login
+      const currentUser = auth.currentUser;
+      const isAdmin = currentUser?.email ? adminEmails.includes(currentUser.email) : false;
+
+      // Register device with remember preference
+      if (currentUser) {
+        try {
+          const deviceName = `${navigator.platform} ${navigator.userAgent.split(' ').pop()}`;
+          await DeviceManagementService.registerDevice(currentUser.uid, deviceName, rememberDevice);
+          
+          if (rememberDevice) {
+            await PersistentAuthService.createPersistentSession(
+              currentUser.uid, 
+              await DeviceManagementService.generateDeviceId(await DeviceManagementService.generateDeviceFingerprint())
+            );
+          }
+        } catch (error) {
+          console.error('Error registering device:', error);
+        }
+      }
+
+      router.replace(isAdmin ? '/admin' : '/dashboard');
     } catch (error: unknown) {
-      const authError = error as { message?: string };
-      setError(authError.message || 'Failed to sign in');
+      const friendlyError = getFirebaseAuthError(error as { code?: string; message?: string });
+      setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
     } finally {
       setLoading(false);
     }
@@ -43,14 +71,36 @@ function LoginContent() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      router.replace('/dashboard');
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user is admin and redirect accordingly
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+
+      const isAdmin = user.email ? adminEmails.includes(user.email) : false;
+
+      // Register device with remember preference
+      try {
+        const deviceName = `${navigator.platform} ${navigator.userAgent.split(' ').pop()}`;
+        await DeviceManagementService.registerDevice(user.uid, deviceName, rememberDevice);
+        
+        if (rememberDevice) {
+          await PersistentAuthService.createPersistentSession(
+            user.uid, 
+            await DeviceManagementService.generateDeviceId(await DeviceManagementService.generateDeviceFingerprint())
+          );
+        }
+      } catch (error) {
+        console.error('Error registering device:', error);
+      }
+
+      router.replace(isAdmin ? '/admin' : '/dashboard');
     } catch (error: unknown) {
-      const authError = error as { message?: string };
-      setError(authError.message || 'Failed to sign in with Google');
+      const friendlyError = getFirebaseAuthError(error as { code?: string; message?: string });
+      setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
     } finally {
       setLoading(false);
     }
@@ -61,31 +111,31 @@ function LoginContent() {
       setError('Please enter your email address first');
       return;
     }
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
       await sendPasswordResetEmail(auth, email);
       setResetEmailSent(true);
     } catch (error: unknown) {
-      const authError = error as { message?: string };
-      setError(authError.message || 'Failed to send reset email');
+      const friendlyError = getFirebaseAuthError(error as { code?: string; message?: string });
+      setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
+          <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
           <h1 className="text-5xl font-serif text-slate-100 mb-4 tracking-wide">
             S P E N D F L O W
           </h1>
-          <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
+          <div className="w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
           <h2 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">
             Welcome Back
           </h2>
@@ -202,13 +252,15 @@ function LoginContent() {
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center">
                 <input
-                  id="remember-me"
-                  name="remember-me"
+                  id="remember-device"
+                  name="remember-device"
                   type="checkbox"
+                  checked={rememberDevice}
+                  onChange={(e) => setRememberDevice(e.target.checked)}
                   className="h-4 w-4 bg-slate-800 border-slate-700 text-amber-600 focus:ring-amber-500"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-slate-400 tracking-wide">
-                  Remember me
+                <label htmlFor="remember-device" className="ml-2 block text-slate-400 tracking-wide">
+                  Remember this device
                 </label>
               </div>
 

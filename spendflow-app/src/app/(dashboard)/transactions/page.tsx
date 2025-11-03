@@ -11,11 +11,13 @@ import { format } from 'date-fns';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { EditTransactionModal } from '@/components/transactions/EditTransactionModal';
 import { AuthGate } from '@/components/auth/AuthGate';
+import { useAccessControl } from '@/lib/services/accessControlService';
+import toast from 'react-hot-toast';
 
 function TransactionsPageContent() {
   const { user } = useAuth();
-  const router = useRouter();
   const { formatAmount } = useCurrency();
+  const { canAddTransaction } = useAccessControl();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
@@ -31,15 +33,41 @@ function TransactionsPageContent() {
   };
 
   const handleAddTransactionClick = async () => {
+    if (!user) return;
+
     try {
-      const cards = await cardsService.getCardsByUserId(user!.uid);
+      const cards = await cardsService.getByUserId(user.uid);
       if (cards.length === 0) {
         setShowNoCardsMessage(true);
         return;
       }
+
+      // Check if user can add a transaction based on their subscription
+      const accessResult = await canAddTransaction();
+
+      if (!accessResult.allowed) {
+        if (accessResult.upgradeRequired) {
+          toast.error(
+            accessResult.reason || 'Upgrade your plan to add more transactions',
+            {
+              duration: 5000,
+              style: {
+                background: '#1e293b',
+                color: '#f1f5f9',
+                border: '1px solid #f59e0b',
+              },
+            }
+          );
+          // TODO: Add upgrade prompt/modal here
+        } else {
+          toast.error(accessResult.reason || 'Cannot add transaction at this time');
+        }
+        return;
+      }
+
       setShowModal(true);
     } catch (error) {
-      console.error('Error checking cards:', error);
+      console.error('Error checking cards or access:', error);
     }
   };
 
@@ -47,6 +75,16 @@ function TransactionsPageContent() {
     if (user) {
       loadData();
       checkCards();
+
+      // Add window focus listener to re-check cards when returning to page
+      const handleFocus = () => {
+        checkCards();
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        window.removeEventListener('focus', handleFocus);
+      };
     }
   }, [user]);
 
@@ -69,14 +107,6 @@ function TransactionsPageContent() {
     } catch (error) {
       console.error('Error checking cards:', error);
     }
-  };
-
-  const handleAddTransaction = () => {
-    if (!hasCards) {
-      setShowNoCardsMessage(true);
-      return;
-    }
-    setShowModal(true);
   };
 
   const filteredTransactions = transactions.filter(t => {
@@ -151,12 +181,12 @@ function TransactionsPageContent() {
 
       {/* Header */}
       <div className="text-center sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md py-4 -mx-4 px-4 border-b border-slate-800 md:bg-transparent md:backdrop-blur-none md:border-0 md:py-0 md:static">
-        <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4 md:mb-8"></div>
+        <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4 md:mb-8"></div>
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 md:mb-4 tracking-wide">
           <span className="md:hidden">TRANSACTIONS</span>
           <span className="hidden md:inline">T R A N S A C T I O N S</span>
         </h1>
-        <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4 md:mb-6"></div>
+        <div className="w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4 md:mb-6"></div>
         <p className="text-slate-400 text-xs md:text-sm tracking-widest uppercase">Financial Activity</p>
       </div>
 
@@ -199,10 +229,7 @@ function TransactionsPageContent() {
           </select>
         </div>
 
-        <button 
-          onClick={handleAddTransactionClick}
-          className="inline-flex items-center gap-2 px-4 py-1.5 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-xs"
-        >
+        <button>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Add Transaction</span>
           <span className="sm:hidden">Add</span>
@@ -212,7 +239,7 @@ function TransactionsPageContent() {
       {/* Transactions List */}
       <div>
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-0.5 bg-gradient-to-r from-amber-600 to-transparent"></div>
+          <div className="w-12 h-0.5 bg-linear-to-r from-amber-600 to-transparent"></div>
           <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Recent Activity</h2>
           <div className="text-slate-600 text-sm">({filteredTransactions.length} transactions)</div>
         </div>
@@ -220,10 +247,10 @@ function TransactionsPageContent() {
         {filteredTransactions.length > 0 ? (
           <div className="space-y-1">
             {filteredTransactions.map((transaction) => (
-              <button
+              <div
                 key={transaction.id}
                 onClick={() => handleTransactionClick(transaction)}
-                className="w-full border-b border-slate-800 py-6 hover:bg-slate-900/30 transition-colors text-left"
+                className="w-full border-b border-slate-800 py-6 hover:bg-slate-900/30 transition-colors text-left cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-6">
@@ -261,7 +288,7 @@ function TransactionsPageContent() {
                           e.stopPropagation();
                           if (window.confirm('Are you sure you want to delete this transaction?')) {
                             try {
-                              await transactionsService.deleteTransaction(transaction.id!);
+                              await transactionsService.delete(transaction.id!);
                               loadData();
                             } catch (error) {
                               console.error('Error deleting transaction:', error);
@@ -278,7 +305,7 @@ function TransactionsPageContent() {
                     </div>
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         ) : (

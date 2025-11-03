@@ -1,3 +1,20 @@
+// Extend the Window interface to include gtag
+type GtagParams = {
+  event_category?: string;
+  event_label?: string;
+  ad_location?: string;
+  ad_size?: string;
+  test_variant?: string;
+  error_message?: string;
+  [key: string]: string | number | boolean | undefined;
+};
+
+declare global {
+  interface Window {
+    gtag?: (command: string, eventName: string, params: GtagParams) => void;
+  }
+}
+
 // Ad performance metrics
 type AdEvent = 'impression' | 'click' | 'viewable' | 'error';
 
@@ -18,7 +35,7 @@ export const trackAdEvent = (
 ) => {
   if (typeof window === 'undefined') return;
 
-  const eventData: Record<string, any> = {
+  const eventData: Record<string, string | number | boolean | undefined> = {
     event_category: 'ad',
     event_label: adUnit,
     ad_location: location,

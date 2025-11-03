@@ -1,15 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { TrendingUp, Award, Plus } from 'lucide-react';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAccessControl } from '@/lib/services/accessControlService';
+import { Plus, Award, Crown } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
+import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { AuthGate } from '@/components/auth/AuthGate';
+import { savingsAccountsService } from '@/lib/services/savingsService';
+import { DashboardAnalytics } from '@/components/dashboard/DashboardAnalytics';
 
 type Transaction = {
   id: string;
@@ -33,13 +38,23 @@ function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
+  const { tier, subscription } = useSubscription();
+  const { canAddCard, canAddTransaction } = useAccessControl();
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cards, setCards] = useState<CardType[]>([]);
+  const [savingsAccounts, setSavingsAccounts] = useState<Array<{ id: string; balance: number; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
   const [selectedCardType, setSelectedCardType] = useState<'credit' | 'debit'>('credit');
+  const [subscriptionWarnings, setSubscriptionWarnings] = useState<{
+    cards: boolean;
+    transactions: boolean;
+  }>({ cards: false, transactions: false });
+  const [analyticsKey, setAnalyticsKey] = useState(0); // Force analytics re-render
+
   const hasCards = cards.length > 0;
   const [stats, setStats] = useState({
     totalBalance: 0,
@@ -52,7 +67,24 @@ function DashboardContent() {
     savings: 0,
   });
 
-  const fetchData = async () => {
+  // Check subscription limits and show warnings
+  const checkSubscriptionLimits = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const cardCheck = await canAddCard();
+      const transactionCheck = await canAddTransaction();
+
+      setSubscriptionWarnings({
+        cards: !cardCheck.allowed,
+        transactions: !transactionCheck.allowed,
+      });
+    } catch (error) {
+      console.error('Error checking subscription limits:', error);
+    }
+  }, [user, canAddCard, canAddTransaction]);
+
+  const fetchData = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -98,6 +130,13 @@ function DashboardContent() {
       
       // Total balance = all available money (both debit and credit available)
       const totalBalance = debitBalance + creditBalance;
+
+      // Fetch savings accounts
+      const savingsData = await savingsAccountsService.getUserAccounts(user.uid);
+      setSavingsAccounts(savingsData);
+
+      // Calculate total savings balance
+      const totalSavingsBalance = savingsData.reduce((sum, account) => sum + account.balance, 0);
       
       setStats({
         totalBalance,
@@ -107,20 +146,24 @@ function DashboardContent() {
         debitCardCount: debitCards.length,
         income,
         expenses,
-        savings: income - expenses,
+        savings: totalSavingsBalance, // Now shows actual savings account balance
       });
+
+      // Check subscription limits
+      await checkSubscriptionLimits();
+
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, checkSubscriptionLimits]);
 
   useEffect(() => {
     if (user) {
       fetchData();
     }
-  }, [user]);
+  }, [user, fetchData]);
 
   if (loading) {
     return (
@@ -132,9 +175,10 @@ function DashboardContent() {
 
   const handleTransactionSuccess = () => {
     fetchData();
+    setAnalyticsKey(prev => prev + 1); // Force analytics refresh
   };
 
-  const handleAddTransactionClick = () => {
+  const handleAddTransactionClick = async () => {
     if (!hasCards) {
       setShowNoCardsMessage(true);
       setTimeout(() => {
@@ -142,12 +186,15 @@ function DashboardContent() {
       }, 2000);
       return;
     }
-    setShowTransactionModal(true);
-  };
 
-  const handleViewCardsClick = (type: 'credit' | 'debit') => {
-    setSelectedCardType(type);
-    setShowCardsModal(true);
+    // Check transaction limits
+    const transactionCheck = await canAddTransaction();
+    if (!transactionCheck.allowed) {
+      // Don't show modal, the upgrade prompt will be visible
+      return;
+    }
+
+    setShowTransactionModal(true);
   };
 
   return (
@@ -198,13 +245,61 @@ function DashboardContent() {
           </div>
           <button
             onClick={handleAddTransactionClick}
-            className="flex items-center gap-2 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm"
+            className="flex items-center gap-2 px-6 py-3 border border-(--theme-accent) text-(--theme-accent) hover:bg-(--theme-accent)/10 transition-colors tracking-wider uppercase text-sm"
           >
             <Plus className="h-5 w-5" />
             <span className="hidden sm:inline">Add Transaction</span>
             <span className="sm:hidden">Add</span>
           </button>
         </div>
+
+        {/* Subscription Status */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between p-4 border border-slate-800 bg-slate-900/30 backdrop-blur-sm rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                <Crown className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <div className="text-slate-100 font-medium">
+                  {tier === 'free' ? 'Essential' : tier === 'pro' ? 'Professional' : 'Enterprise'} Plan
+                </div>
+                <div className="text-slate-400 text-sm">
+                  {subscription?.currentPeriodEnd
+                    ? `Renews ${subscription.currentPeriodEnd.toLocaleDateString()}`
+                    : 'Free plan'
+                  }
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/subscription')}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-medium rounded-lg transition-colors text-sm"
+            >
+              {tier === 'enterprise' ? 'Manage Plan' : 'Upgrade'}
+            </button>
+          </div>
+        </div>
+
+        {/* Upgrade Prompts */}
+        {(subscriptionWarnings.cards || subscriptionWarnings.transactions) && (
+          <div className="mb-8 space-y-4">
+            {subscriptionWarnings.cards && (
+              <UpgradePrompt
+                title="Card Limit Reached"
+                message="You've reached your card limit. Upgrade to add more cards to your account."
+                feature="cards"
+              />
+            )}
+            {subscriptionWarnings.transactions && (
+              <UpgradePrompt
+                title="Transaction Limit Reached"
+                message="You've reached your transaction limit. Upgrade to add unlimited transactions."
+                feature="transactions"
+              />
+            )}
+          </div>
+        )}
 
         {/* Card Balance Grid */}
         <div className="grid grid-cols-2 gap-8 mb-12">
@@ -215,9 +310,9 @@ function DashboardContent() {
             }}
             className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-blue-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-amber-600 pl-6">
+            <div className="border-l-2 border-(--theme-accent) pl-6">
               <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Credit Cards</div>
-              <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.creditBalance)}</div>
+              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.creditBalance)}</div>
               <div className="text-slate-600 text-sm">{stats.creditCardCount} {stats.creditCardCount === 1 ? 'Card' : 'Cards'}</div>
             </div>
           </button>
@@ -229,9 +324,9 @@ function DashboardContent() {
             }}
             className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-amber-600 pl-6">
+            <div className="border-l-2 border-(--theme-accent) pl-6">
               <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Debit Cards</div>
-              <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.debitBalance)}</div>
+              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.debitBalance)}</div>
               <div className="text-slate-600 text-sm">{stats.debitCardCount} {stats.debitCardCount === 1 ? 'Card' : 'Cards'}</div>
             </div>
           </button>
@@ -245,7 +340,7 @@ function DashboardContent() {
           >
             <div className="border-l-2 border-green-600 pl-6">
               <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Income</div>
-              <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.income)}</div>
+              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.income)}</div>
               <div className="text-slate-600 text-sm">Total Revenue</div>
             </div>
           </button>
@@ -256,7 +351,7 @@ function DashboardContent() {
           >
             <div className="border-l-2 border-red-600 pl-6">
               <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Expenses</div>
-              <div className="text-4xl font-serif text-slate-100 mb-2">{formatAmount(stats.expenses)}</div>
+              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.expenses)}</div>
               <div className="text-slate-600 text-sm">Total Expenditure</div>
             </div>
           </button>
@@ -265,7 +360,7 @@ function DashboardContent() {
         {/* Portfolio Section */}
         <div className="mb-12">
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-0.5 bg-gradient-to-r from-amber-600 to-transparent"></div>
+            <div className="w-12 h-0.5 bg-linear-to-r from-(--theme-accent) to-transparent"></div>
             <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Portfolio Overview</h2>
           </div>
 
@@ -275,24 +370,29 @@ function DashboardContent() {
                 onClick={() => router.push('/cards')}
                 className="p-8 text-center hover:bg-slate-900/50 transition-colors"
               >
-                <div className="text-amber-400 mb-3">
+                <div className="text-(--theme-accent) mb-3">
                   <Award className="h-8 w-8 mx-auto" />
                 </div>
                 <div className="text-3xl font-serif text-slate-100 mb-2">{cards.length}</div>
                 <div className="text-slate-500 text-xs tracking-widest uppercase">Accounts</div>
               </button>
-              <div className="p-8 text-center">
-                <div className="text-amber-400 mb-3">
+              <button
+                onClick={() => router.push('/savings')}
+                className="p-8 text-center hover:bg-slate-900/50 transition-colors"
+              >
+                <div className="text-(--theme-accent) mb-3">
                   <div className="text-3xl">◆</div>
                 </div>
-                <div className="text-3xl font-serif text-slate-100 mb-2">{formatAmount(stats.savings)}</div>
-                <div className="text-slate-500 text-xs tracking-widest uppercase">Savings</div>
-              </div>
+                <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.savings)}</div>
+                <div className="text-slate-500 text-xs tracking-widest uppercase">
+                  {savingsAccounts.length} {savingsAccounts.length === 1 ? 'Account' : 'Accounts'}
+                </div>
+              </button>
               <button
                 onClick={() => router.push('/transactions')}
                 className="p-8 text-center hover:bg-slate-900/50 transition-colors"
               >
-                <div className="text-amber-400 mb-3">
+                <div className="text-(--theme-accent) mb-3">
                   <div className="text-3xl">★</div>
                 </div>
                 <div className="text-3xl font-serif text-slate-100 mb-2">{transactions.length}</div>
@@ -306,12 +406,12 @@ function DashboardContent() {
         <div className="mb-12">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-0.5 bg-gradient-to-r from-amber-600 to-transparent"></div>
+              <div className="w-12 h-0.5 bg-linear-to-r from-(--theme-accent) to-transparent"></div>
               <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Recent Activity</h2>
             </div>
             <button
               onClick={() => router.push('/transactions')}
-              className="text-sm text-amber-400 hover:text-amber-300 tracking-wider uppercase"
+              className="text-sm text-(--theme-accent) hover:text-(--theme-accent)/80 tracking-wider uppercase"
             >
               View All →
             </button>
@@ -323,13 +423,13 @@ function DashboardContent() {
                 <div key={transaction.id} className="border-b border-slate-800 py-6 hover:bg-slate-900/30 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-6">
-                      <div className={`w-1 h-12 ${transaction.type === 'income' ? 'bg-green-600' : 'bg-amber-600'}`}></div>
+                      <div className={`w-1 h-12 ${transaction.type === 'income' ? 'bg-green-600' : 'bg-(--theme-accent)'}`}></div>
                       <div>
                         <div className="text-slate-200 font-serif mb-1">{transaction.description}</div>
                         <div className="text-slate-600 text-xs tracking-wider uppercase">{transaction.category}</div>
                       </div>
                     </div>
-                    <div className={`font-serif text-xl ${transaction.type === 'income' ? 'text-green-400' : 'text-slate-300'}`}>
+                    <div className={`font-serif text-lg sm:text-xl ${transaction.type === 'income' ? 'text-green-400' : 'text-slate-300'} break-all max-w-full`}>
                       {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
                     </div>
                   </div>
@@ -343,9 +443,14 @@ function DashboardContent() {
           </div>
         </div>
 
+        {/* Analytics Section */}
+        <div className="mb-12">
+          <DashboardAnalytics key={analyticsKey} />
+        </div>
+
         {/* Quote */}
         <div className="text-center py-12 border-t border-slate-800">
-          <div className="text-amber-400/40 text-6xl mb-4">&ldquo;</div>
+          <div className="text-(--theme-accent)/40 text-6xl mb-4">&ldquo;</div>
           <p className="text-slate-400 text-lg font-serif italic mb-4 max-w-2xl mx-auto">
             Wealth consists not in having great possessions, but in having few wants.
           </p>

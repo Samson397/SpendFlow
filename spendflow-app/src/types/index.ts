@@ -1,12 +1,9 @@
-export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+// Export all subscription types
+export * from './subscription';
 
-export interface SubscriptionInfo {
-  tier: SubscriptionTier;
-  status: 'active' | 'canceled' | 'past_due' | 'unpaid';
-  currentPeriodEnd: Date;
-  cancelAtPeriodEnd: boolean;
-  startDate: Date;
-}
+// Legacy exports for backward compatibility
+export type { SubscriptionInfo } from './subscription';
+export type { PlanLimits } from './subscription';
 
 export interface UserProfile {
   id: string;
@@ -19,18 +16,13 @@ export interface UserProfile {
   disabled?: boolean;
   emailVerified?: boolean;
   lastActive?: Date;
+  subscriptionTier?: SubscriptionTier; // For admin management
   metadata?: {
     lastSignInTime?: string;
     creationTime?: string;
   };
   subscription: SubscriptionInfo;
-  features: {
-    maxCards: number;
-    maxTransactions: number;
-    analytics: boolean;
-    export: boolean;
-    prioritySupport: boolean;
-  };
+  features: PlanLimits;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,17 +68,47 @@ export interface LimitIncreaseRequest {
   notes?: string;
 }
 
+export interface SavingsAccount {
+  id: string;
+  userId: string;
+  accountNumber: string;
+  accountType: 'savings' | 'checking';
+  balance: number;
+  currency: string;
+  name: string;
+  interestRate?: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Transfer {
+  id: string;
+  userId: string;
+  fromAccountId: string;
+  fromAccountType: 'card' | 'savings';
+  toAccountId: string;
+  toAccountType: 'card' | 'savings';
+  amount: number;
+  description?: string;
+  status: 'pending' | 'completed' | 'failed' | 'reversed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Transaction {
   id: string;
   userId: string;
-  cardId: string;
+  cardId?: string;
+  savingsAccountId?: string;
   amount: number;
-  type: 'expense' | 'income' | 'refund' | 'transfer';
+  type: 'expense' | 'income' | 'refund' | 'transfer' | 'deposit' | 'withdrawal';
   category: string;
   description: string;
   date: Date;
   isRecurring: boolean;
   recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  transferId?: string; // Reference to Transfer document for transfer transactions
   createdAt: Date;
   updatedAt: Date;
 }

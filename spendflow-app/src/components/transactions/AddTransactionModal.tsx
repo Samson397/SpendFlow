@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, TrendingUp, TrendingDown, Camera } from 'lucide-react';
 import { transactionsService, cardsService } from '@/lib/firebase/firestore';
+import { categoryService } from '@/lib/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { ScanReceiptModal } from './ScanReceiptModal';
@@ -25,6 +26,10 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
   const [loading, setLoading] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
   const [cards, setCards] = useState<Array<{ id: string; name?: string; type: string; lastFour?: string; balance: number }>>([]);
+  const [availableCategories, setAvailableCategories] = useState<{ income: string[]; expense: string[] }>({
+    income: [],
+    expense: []
+  });
   const [formData, setFormData] = useState({
     type: defaultType,
     amount: '',
@@ -48,6 +53,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
   useEffect(() => {
     if (isOpen && user) {
       loadCards();
+      loadCategories();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, user]);
@@ -61,6 +67,25 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
       }
     } catch (error) {
       console.error('Error loading cards:', error);
+    }
+  };
+
+  const loadCategories = async () => {
+    if (!user) return;
+
+    try {
+      const allCategories = await categoryService.getAllCategories(user.uid);
+      const incomeCategories = allCategories.filter(cat => cat.type === 'income').map(cat => cat.name);
+      const expenseCategories = allCategories.filter(cat => cat.type === 'expense').map(cat => cat.name);
+
+      setAvailableCategories({
+        income: incomeCategories.length > 0 ? incomeCategories : categories.income,
+        expense: expenseCategories.length > 0 ? expenseCategories : categories.expense,
+      });
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      // Fallback to default categories
+      setAvailableCategories(categories);
     }
   };
 
@@ -255,7 +280,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
             >
               <option value="">Select category</option>
-              {categories[formData.type].map((cat) => (
+              {availableCategories[formData.type].map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>

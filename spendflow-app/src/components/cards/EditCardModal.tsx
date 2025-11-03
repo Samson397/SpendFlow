@@ -17,6 +17,7 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
   const [formData, setFormData] = useState({
     name: card.name || '',
     balance: card.balance || 0,
+    expiryDate: card.expiryDate || '',
     color: card.color || '#3b82f6',
     creditLimit: card.creditLimit || 0,
     statementDay: card.statementDay || 1,
@@ -29,6 +30,7 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
       setFormData({
         name: card.name || '',
         balance: card.balance || 0,
+        expiryDate: card.expiryDate || '',
         color: card.color || '#3b82f6',
         creditLimit: card.creditLimit || 0,
         statementDay: card.statementDay || 1,
@@ -43,9 +45,10 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
 
     try {
       // Build update object without undefined values
-      const updateData: any = {
+      const updateData: Partial<Card> = {
         name: formData.name,
         balance: Number(formData.balance),
+        expiryDate: formData.expiryDate,
         color: formData.color,
       };
 
@@ -111,11 +114,35 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
               type="number"
               step="0.01"
               required
-              value={formData.balance}
-              onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) })}
+              value={isNaN(formData.balance) ? '' : formData.balance}
+              onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
               placeholder="0.00"
               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
             />
+          </div>
+
+          {/* Expiry Date */}
+          <div>
+            <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+              Expiry Date
+            </label>
+            <input
+              type="text"
+              required
+              maxLength={5}
+              value={formData.expiryDate}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 2) {
+                  setFormData({ ...formData, expiryDate: `${value.slice(0, 2)}/${value.slice(2, 4)}` });
+                } else {
+                  setFormData({ ...formData, expiryDate: value });
+                }
+              }}
+              placeholder="MM/YY"
+              className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
+            />
+            <p className="text-slate-500 text-xs mt-1">Format: MM/YY (e.g., 12/25)</p>
           </div>
 
           {/* Credit Card Specific Fields */}

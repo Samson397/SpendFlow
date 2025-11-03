@@ -1,0 +1,134 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             (request.auth.token.email == 'samsondorot@gmail.com' || 
+              request.auth.token.email == 'spendflowapp@gmail.com');
+    }
+    
+    // Users collection - users can only access their own profile, admins can read all
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Transactions collection - users can only access their own transactions, admins can read all
+    match /transactions/{transactionId} {
+      allow read, write: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Cards collection - users can only access their own cards, admins can read all
+    match /cards/{cardId} {
+      allow read, write: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Limit increase requests - users can only access their own requests, admins can read all
+    match /limitIncreaseRequests/{requestId} {
+      allow read, write: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Expenses collection - users can only access their own expenses
+    match /expenses/{expenseId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Income collection - users can only access their own income
+    match /income/{incomeId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Savings accounts collection - users can only access their own accounts
+    match /savingsAccounts/{accountId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Transfers collection - users can only access their own transfers, admins can read all
+    match /transfers/{transferId} {
+      allow read, write: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Categories collection - read-only for all authenticated users
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Categories are managed by system only
+    }
+    
+    // Contact messages - only admins can access
+    match /contactMessages/{messageId} {
+      allow read, write: if isAdmin();
+      allow create: if isAuthenticated(); // Allow users to send messages
+    }
+    
+    // Announcements - read-only for all authenticated users
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Alerts - only admins can access
+    match /alerts/{alertId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Security events - only admins can access
+    match /securityEvents/{eventId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Activity logs - only admins can access
+    match /activity/{activityId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Activities collection - authenticated users can write, admins can read
+    match /activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow write: if false; // Only creation allowed, no updates
+    }
+    
+    // Settings - allow read access for maintenance mode, write only for admins
+    match /settings/{document} {
+      allow read: if isAuthenticated(); // Allow reading settings for maintenance mode etc.
+      allow write: if isAdmin();
+    }
+    
+    // System collections - only admins can access
+    match /system/{document} {
+      allow read, write: if isAdmin();
+    }
+    
+    // User activity tracking - users can only write their own activity
+    match /userActivity/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Online status - users can only write their own status
+    match /status/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Deny access to any undefined collections
+    match /{document=**} {
+      allow read, write, create: if false;
+    }
+  }
+}

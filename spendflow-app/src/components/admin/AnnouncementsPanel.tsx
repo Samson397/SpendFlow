@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, Megaphone, Plus, Search, Filter, X, Clock, Users, Globe, AlertTriangle, Check, Calendar, Clock as ClockIcon } from 'lucide-react';
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow } from 'date-fns';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/firebase';
 
 interface Announcement {
@@ -111,19 +111,8 @@ export default function AnnouncementsPanel() {
       // Add to Firestore
       const docRef = await addDoc(collection(db, 'announcements'), announcementData);
       
-      // Update local state with the new announcement
-      const newAnnouncement: Announcement = {
-        id: docRef.id,
-        ...announcementData,
-        startDate: new Date(formData.startDate),
-        endDate: new Date(formData.endDate),
-        createdAt: new Date()
-      };
-
-      setAnnouncements(prev => [newAnnouncement, ...prev]);
+      // Reset form (real-time listener will update the list automatically)
       setShowCreateModal(false);
-      
-      // Reset form
       setFormData({
         title: '',
         content: '',
@@ -139,28 +128,32 @@ export default function AnnouncementsPanel() {
     }
   };
 
-  // Load announcements from Firestore
+  // Load announcements from Firestore with real-time updates
   useEffect(() => {
-    const loadAnnouncements = async () => {
-      try {
-        const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const loadedAnnouncements = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          startDate: doc.data().startDate?.toDate(),
-          endDate: doc.data().endDate?.toDate(),
-          createdAt: doc.data().createdAt?.toDate()
-        })) as Announcement[];
-        setAnnouncements(loadedAnnouncements);
-      } catch (error) {
-        console.error('Error loading announcements:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    console.log('Setting up admin announcements real-time listener...');
+    const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      console.log('Admin real-time announcements update:', querySnapshot.docs.length, 'announcements found');
+      const loadedAnnouncements = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        startDate: doc.data().startDate?.toDate(),
+        endDate: doc.data().endDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate()
+      })) as Announcement[];
+      setAnnouncements(loadedAnnouncements);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error in admin real-time announcements listener:', error);
+      setLoading(false);
+    });
 
-    loadAnnouncements();
+    // Cleanup function
+    return () => {
+      console.log('Cleaning up admin announcements real-time listener');
+      unsubscribe();
+    };
   }, []);
 
   const deleteAnnouncement = async (id: string) => {
@@ -169,11 +162,8 @@ export default function AnnouncementsPanel() {
     }
     
     try {
-      // Delete from Firestore
+      // Delete from Firestore (real-time listener will update the list automatically)
       await deleteDoc(doc(db, 'announcements', id));
-      
-      // Update local state
-      setAnnouncements(announcements.filter(a => a.id !== id));
     } catch (error) {
       console.error('Error deleting announcement:', error);
       alert('Failed to delete announcement. Please try again.');

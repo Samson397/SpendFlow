@@ -1,13 +1,14 @@
 import * as admin from 'firebase-admin';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { sendContactEmail } from './email';
-import { 
-  getMessages, 
-  getMessage, 
-  sendMessage, 
-  updateMessage, 
-  deleteMessage 
+import {
+  getMessages,
+  getMessage,
+  sendMessage,
+  updateMessage,
+  deleteMessage
 } from './messages';
+import { upgradeSubscription } from './subscription';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -21,11 +22,12 @@ setGlobalOptions({
 });
 
 // Export the Cloud Functions
-export { 
+export {
   sendContactEmail,
   getMessages,
   getMessage,
   sendMessage,
   updateMessage,
-  deleteMessage
+  deleteMessage,
+  upgradeSubscription
 };

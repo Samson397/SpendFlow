@@ -55,21 +55,40 @@ export const receiptScannerService = {
    */
   async extractTextFromImage(base64Image: string): Promise<string> {
     try {
+      console.log('Loading Tesseract.js...');
       // Dynamically import Tesseract to avoid SSR issues
       const Tesseract = await import('tesseract.js');
+      console.log('Tesseract.js loaded successfully');
       
-      const { data: { text } } = await Tesseract.recognize(
+      const result = await Tesseract.recognize(
         base64Image,
         'eng',
         {
-          logger: (m) => console.log(m), // Progress logger
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+            }
+          },
         }
       );
       
-      return text;
+      console.log('OCR completed successfully');
+      return result.data.text;
     } catch (error) {
       console.error('OCR Error:', error);
+      // Check if it's a mobile/permission related error
+      if (error instanceof Error) {
+        if (error.message.includes('permission') || error.message.includes('denied')) {
+          console.warn('OCR permission error detected');
+          throw new Error('Camera or file access permission denied. Please check your browser permissions.');
+        }
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          console.warn('OCR network error detected');
+          throw new Error('Network error while loading OCR. Please check your connection.');
+        }
+      }
       // Fallback to empty string if OCR fails
+      console.log('OCR failed, using fallback');
       return '';
     }
   },

@@ -160,6 +160,44 @@ export const usersService = {
   async makeAdmin(uid: string): Promise<void> {
     const docRef = doc(db, 'users', uid);
     await updateDoc(docRef, { isAdmin: true });
+  },
+
+  async updateTier(uid: string, tier: 'free' | 'pro' | 'enterprise'): Promise<void> {
+    const docRef = doc(db, 'users', uid);
+    const now = new Date();
+    
+    // Define features based on tier
+    const features = {
+      free: {
+        maxCards: 2,
+        maxTransactions: 100,
+        analytics: false,
+        export: false,
+        prioritySupport: false
+      },
+      pro: {
+        maxCards: 10,
+        maxTransactions: 1000,
+        analytics: true,
+        export: true,
+        prioritySupport: false
+      },
+      enterprise: {
+        maxCards: 50,
+        maxTransactions: 10000,
+        analytics: true,
+        export: true,
+        prioritySupport: true
+      }
+    };
+
+    await updateDoc(docRef, {
+      'subscription.tier': tier,
+      'subscription.status': 'active',
+      'subscription.updatedAt': now,
+      'features': features[tier],
+      updatedAt: now
+    });
   }
 };
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Megaphone, Clock } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   collection, 
   doc, 
@@ -13,20 +13,22 @@ import {
   arrayUnion, 
   serverTimestamp,
   orderBy, 
-  limit 
+  limit,
+  onSnapshot
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/firebase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Announcement {
   id: string;
   title: string;
   content: string;
   type: 'info' | 'warning' | 'critical' | 'success';
-  audience: 'all' | 'free' | 'premium';
+  audience: 'all' | 'free' | 'pro' | 'enterprise';
   startDate: { toDate: () => Date } | Date;
   endDate: { toDate: () => Date } | Date;
   isActive: boolean;
-  createdAt: { toDate: () => Date } | Date;
+  createdAt: Date;
   createdBy: string;
 }
 
@@ -34,6 +36,8 @@ export function AnnouncementsBanner() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userTier, setUserTier] = useState<string>('free');
+  const { user } = useAuth();
 
   // Load dismissed announcements from localStorage on component mount
   useEffect(() => {
@@ -54,23 +58,47 @@ export function AnnouncementsBanner() {
     }
   }, []);
 
-  // Fetch announcements from Firestore
+  // Get user subscription tier
   useEffect(() => {
-    const fetchAnnouncements = async () => {
-      try {
-        console.log('Fetching announcements...');
-        const now = new Date();
-        const q = query(
-          collection(db, 'announcements'),
-          where('isActive', '==', true),
-          where('startDate', '<=', now),
-          where('endDate', '>=', now),
-          orderBy('startDate', 'desc'),
-          limit(3)
-        );
+    const getUserTier = async () => {
+      if (user?.uid) {
+        try {
+          const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+          if (!userDoc.empty) {
+            const userData = userDoc.docs[0].data();
+            const tier = userData?.subscription?.tier || 'free';
+            setUserTier(tier);
+            console.log('User tier set to:', tier);
+          }
+        } catch (error) {
+          console.error('Error getting user tier:', error);
+          setUserTier('free'); // Default to free tier
+        }
+      } else {
+        setUserTier('free'); // Default for non-authenticated users
+      }
+    };
 
-        const querySnapshot = await getDocs(q);
-        console.log('Announcements query result:', querySnapshot.docs.length, 'announcements found');
+    getUserTier();
+  }, [user]);
+
+  // Fetch announcements from Firestore with real-time updates
+  useEffect(() => {
+    const fetchAnnouncements = () => {
+      console.log('Setting up real-time announcements listener...');
+      const now = new Date();
+      const q = query(
+        collection(db, 'announcements'),
+        where('isActive', '==', true),
+        where('startDate', '<=', now),
+        where('endDate', '>=', now),
+        orderBy('startDate', 'desc'),
+        limit(3)
+      );
+
+      // Set up real-time listener
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        console.log('Real-time announcements update:', querySnapshot.docs.length, 'announcements found');
         
         const announcementsData = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -91,18 +119,36 @@ export function AnnouncementsBanner() {
           return announcement;
         }) as Announcement[];
 
-        console.log('Setting announcements:', announcementsData);
+        console.log('Setting announcements from real-time update:', announcementsData);
         setAnnouncements(announcementsData);
-      } catch (error) {
-        console.error('Error fetching announcements:', error);
-      } finally {
-        console.log('Finished loading announcements');
         setLoading(false);
-      }
+      }, (error) => {
+        console.error('Error in real-time announcements listener:', error);
+        setLoading(false);
+      });
+
+      return unsubscribe;
     };
 
-    fetchAnnouncements();
+    const unsubscribe = fetchAnnouncements();
+
+    // Cleanup function to unsubscribe from real-time listener
+    return () => {
+      console.log('Cleaning up announcements real-time listener');
+      unsubscribe();
+    };
   }, []);
+
+  // Filter announcements based on user tier
+  const filteredAnnouncements = announcements.filter(announcement => {
+    // Always show 'all' audience announcements
+    if (announcement.audience === 'all') return true;
+    
+    // Show announcements matching user's subscription tier
+    return announcement.audience === userTier;
+  });
+
+  // Fetch announcements from Firestore
 
   const dismissAnnouncement = async (id: string) => {
     try {
@@ -137,18 +183,36 @@ export function AnnouncementsBanner() {
   }
 
   console.log('Announcements loaded:', announcements);
-  console.log('Dismissed announcements:', dismissedAnnouncements);
+  console.log('Filtered announcements by user tier:', filteredAnnouncements);
 
-  const visibleAnnouncements = announcements.filter(
+  const visibleAnnouncements = filteredAnnouncements.filter(
     announcement => !dismissedAnnouncements.includes(announcement.id)
   );
 
-  console.log('Visible announcements after filtering:', visibleAnnouncements);
+  console.log('Final visible announcements after dismissal filter:', visibleAnnouncements);
 
   if (visibleAnnouncements.length === 0) {
     console.log('No visible announcements to display');
     return null;
   }
+
+  const getRelativeTime = (date: Date | string) => {
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      const now = new Date();
+      const seconds = Math.floor((now.getTime() - dateObj.getTime()) / 1000);
+      
+      if (seconds < 60) return 'Just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+      if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w ago`;
+      return `${Math.floor(seconds / 2592000)}mo ago`;
+    } catch (error) {
+      console.error('Error calculating relative time:', error);
+      return 'Unknown';
+    }
+  };
 
   const getTypeStyles = (type: string) => {
     const baseStyles = 'relative overflow-hidden group transform hover:scale-[1.01] transition-all duration-300 border border-white/20';
@@ -167,7 +231,7 @@ export function AnnouncementsBanner() {
   };
 
   // Animation variants for framer-motion
-  const container = {
+  const container: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -178,7 +242,7 @@ export function AnnouncementsBanner() {
     }
   };
 
-  const item = {
+  const item: Variants = {
     hidden: { 
       opacity: 0, 
       y: 20,
@@ -265,7 +329,7 @@ export function AnnouncementsBanner() {
                       </p>
                       <div className="mt-2.5 flex items-center text-xs font-medium text-gray-600">
                         <Clock className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
-                        <span>Just now</span>
+                        <span>{getRelativeTime(announcement.createdAt)}</span>
                       </div>
                     </div>
                     <div className="ml-4 flex-shrink-0">

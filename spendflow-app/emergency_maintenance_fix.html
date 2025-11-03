@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emergency Maintenance Mode Fix</title>
+</head>
+<body>
+    <h1>Emergency Maintenance Mode Fix</h1>
+    <p>Copy and paste this code into your browser console:</p>
+    
+    <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd;">
+// Emergency Maintenance Mode Disable
+(async () => {
+  try {
+    // Import Firebase modules
+    const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
+    
+    // You'll need to replace these with your actual Firebase config
+    const firebaseConfig = {
+      // Copy your Firebase config here
+    };
+    
+    // Initialize Firebase (you'll need to set this up)
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    // Disable maintenance mode
+    const settingsRef = doc(db, "settings", "app");
+    await updateDoc(settingsRef, { 
+      maintenanceMode: false,
+      updatedAt: new Date().toISOString() 
+    });
+    
+    console.log("✅ Maintenance mode disabled!");
+    alert("Maintenance mode disabled! Refresh the page.");
+    
+  } catch (error) {
+    console.error("❌ Error:", error);
+    alert("Error disabling maintenance mode. Check console for details.");
+  }
+})();
+    </pre>
+    
+    <h2>Alternative: Firebase Console</h2>
+    <ol>
+        <li>Go to <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
+        <li>Select your project</li>
+        <li>Go to Firestore Database</li>
+        <li>Navigate to: settings/app document</li>
+        <li>Set maintenanceMode field to: false</li>
+        <li>Or delete the maintenanceMode field</li>
+    </ol>
+</body>
+</html>

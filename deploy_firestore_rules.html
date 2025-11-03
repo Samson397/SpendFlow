@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firestore Rules Deployment</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .rules { background: #f4f4f4; padding: 15px; border: 1px solid #ddd; border-radius: 5px; font-family: monospace; white-space: pre; }
+        button { background: #4285f4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 0; }
+        button:hover { background: #3367d6; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Deploy Firestore Security Rules</h1>
+    
+    <h2>Step 1: Go to Firebase Console</h2>
+    <p><a href="https://console.firebase.google.com" target="_blank">Open Firebase Console</a></p>
+    
+    <h2>Step 2: Select Your Project</h2>
+    <p>Choose your SpendFlow project</p>
+    
+    <h2>Step 3: Navigate to Firestore Rules</h2>
+    <p>Go to Firestore Database → Rules tab</p>
+    
+    <h2>Step 4: Replace Rules Content</h2>
+    <p>Copy and paste the rules below:</p>
+    
+    <button onclick="copyToClipboard()">📋 Copy Rules to Clipboard</button>
+    
+    <div class="rules" id="rulesContent">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             (request.auth.token.email == 'samsondorot@gmail.com' || 
+              request.auth.token.email == get(/databases/$(database)/documents/settings/app).data.adminEmail);
+    }
+    
+    // Users collection - users can only access their own profile
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Transactions collection - users can only access their own transactions
+    match /transactions/{transactionId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Cards collection - users can only access their own cards
+    match /cards/{cardId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Expenses collection - users can only access their own expenses
+    match /expenses/{expenseId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Income collection - users can only access their own income
+    match /income/{incomeId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Savings accounts collection - users can only access their own accounts
+    match /savingsAccounts/{accountId} {
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Categories collection - read-only for all authenticated users
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Categories are managed by system only
+    }
+    
+    // Contact messages - only admins can access
+    match /contactMessages/{messageId} {
+      allow read, write: if isAdmin();
+      allow create: if isAuthenticated(); // Allow users to send messages
+    }
+    
+    // Announcements - read-only for all authenticated users
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Security events - only admins can access
+    match /securityEvents/{eventId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Activity logs - only admins can access
+    match /activity/{activityId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Settings - only admins can access and modify
+    match /settings/{document} {
+      allow read, write: if isAdmin();
+    }
+    
+    // System collections - only admins can access
+    match /system/{document} {
+      allow read, write: if isAdmin();
+    }
+    
+    // User activity tracking - users can only write their own activity
+    match /userActivity/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Online status - users can only write their own status
+    match /onlineStatus/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}</div>
+    
+    <h2>Step 5: Publish Rules</h2>
+    <p>Click the "Publish" button and wait for confirmation.</p>
+    
+    <h2>✅ After Deployment</h2>
+    <p>Regular users will be able to:</p>
+    <ul>
+        <li>✅ Add, edit, and delete their own transactions</li>
+        <li>✅ Manage their payment cards</li>
+        <li>✅ Track expenses and income</li>
+        <li>✅ Access all dashboard features</li>
+        <li>✅ Send contact messages</li>
+    </ul>
+    
+    <script>
+        function copyToClipboard() {
+            const rulesText = document.getElementById('rulesContent').textContent;
+            navigator.clipboard.writeText(rulesText).then(() => {
+                alert('✅ Rules copied to clipboard!');
+            }).catch(err => {
+                alert('❌ Failed to copy: ' + err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = rulesText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('✅ Rules copied to clipboard (fallback method)!');
+            });
+        }
+    </script>
+</body>
+</html>

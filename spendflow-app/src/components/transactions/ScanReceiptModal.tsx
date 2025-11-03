@@ -28,10 +28,17 @@ export function ScanReceiptModal({ isOpen, onClose, onDataExtracted }: ScanRecei
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (file: File) => {
-    console.log('handleFileSelect called with file:', file.name, file.type);
+    console.log('handleFileSelect called with file:', file.name, file.type, 'size:', file.size);
     
+    // Check file size (mobile browsers have limits)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setError('File size too large. Please select a file smaller than 10MB.');
+      return;
+    }
+
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      setError('Please select an image file (JPG, PNG, etc.)');
       return;
     }
 
@@ -43,14 +50,23 @@ export function ScanReceiptModal({ isOpen, onClose, onDataExtracted }: ScanRecei
       // Show preview
       const reader = new FileReader();
       reader.onload = (e) => {
-        console.log('Preview loaded');
+        console.log('Preview loaded successfully');
         setPreview(e.target?.result as string);
+      };
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        setError('Failed to read file. Please try again.');
+        setScanning(false);
       };
       reader.readAsDataURL(file);
 
-      // Scan receipt
-      console.log('Calling receiptScannerService...');
-      const data = await receiptScannerService.scanReceipt(file);
+      // Scan receipt with timeout for mobile
+      const scanPromise = receiptScannerService.scanReceipt(file);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Scan timeout')), 30000)
+      );
+
+      const data = await Promise.race([scanPromise, timeoutPromise]);
       console.log('Scan complete, data:', data);
       
       // Set default date to today if not found
@@ -62,8 +78,9 @@ export function ScanReceiptModal({ isOpen, onClose, onDataExtracted }: ScanRecei
       console.log('Extracted data set:', data);
       
     } catch (err) {
-      setError('Failed to scan receipt. Please try again or enter manually.');
       console.error('Receipt scan error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to scan receipt: ${errorMessage}. Please try again or enter manually.`);
     } finally {
       setScanning(false);
       console.log('Scanning finished');
@@ -102,7 +119,7 @@ export function ScanReceiptModal({ isOpen, onClose, onDataExtracted }: ScanRecei
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-60"
       onClick={handleClose}
     >
       <div

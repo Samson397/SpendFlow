@@ -1,13 +1,15 @@
 'client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Mail, Shield, Database, Clock, Bell, Users, CreditCard, Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/firebase';
 
 export default function SettingsPanel() {
   const [settings, setSettings] = useState({
     appName: 'SpendFlow',
-    adminEmail: 'admin@spendflow.com',
+    adminEmail: 'spendflowapp@gmail.com', // Updated to user's email
     maintenanceMode: false,
     registrationEnabled: true,
     emailNotifications: true,
@@ -18,10 +20,59 @@ export default function SettingsPanel() {
     enableAuditLogs: true,
     enableAPIAccess: false,
     backupFrequency: 'daily' as 'daily' | 'weekly' | 'monthly',
+    fromEmail: 'spendflowapp@gmail.com', // Added configurable from email
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
+
+  // Load settings from Firestore on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settingsRef = doc(db, 'settings', 'app');
+        const settingsDoc = await getDoc(settingsRef);
+        
+        if (settingsDoc.exists()) {
+          const savedSettings = settingsDoc.data();
+          console.log('Loading saved settings:', savedSettings);
+          
+          // Start with defaults, then override with saved settings
+          const defaultSettings = {
+            appName: 'SpendFlow',
+            adminEmail: 'spendflowapp@gmail.com',
+            maintenanceMode: false,
+            registrationEnabled: true,
+            emailNotifications: true,
+            dataRetentionDays: 90,
+            sessionTimeout: 30,
+            maxLoginAttempts: 5,
+            enable2FA: true,
+            enableAuditLogs: true,
+            enableAPIAccess: false,
+            backupFrequency: 'daily' as 'daily' | 'weekly' | 'monthly',
+            fromEmail: 'spendflowapp@gmail.com',
+          };
+          
+          // Merge defaults with saved settings
+          const mergedSettings = {
+            ...defaultSettings,
+            ...savedSettings,
+          };
+          
+          console.log('Merged settings:', mergedSettings);
+          setSettings(mergedSettings);
+        } else {
+          console.log('No saved settings found, using defaults');
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+        // Continue with default settings if loading fails
+      }
+    };
+
+    loadSettings();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -35,8 +86,15 @@ export default function SettingsPanel() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      // Here you would typically make an API call to save the settings
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      
+      // Save settings to Firestore
+      const settingsRef = doc(db, 'settings', 'app');
+      await setDoc(settingsRef, {
+        ...settings,
+        updatedAt: serverTimestamp(),
+        updatedBy: 'admin' // In a real app, this would be the current user
+      }, { merge: true });
+      
       toast.success('Settings saved successfully');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -123,6 +181,9 @@ export default function SettingsPanel() {
                       onChange={handleChange}
                       className="mt-1 block w-full rounded-md border-slate-700 bg-slate-900 text-white shadow-sm focus:border-amber-500 focus:ring-amber-500 sm:text-sm"
                     />
+                    <p className="mt-1 text-xs text-slate-400">
+                      Primary contact email for system notifications
+                    </p>
                   </div>
                   <div className="flex items-start">
                     <div className="flex items-center h-5">
@@ -286,10 +347,13 @@ export default function SettingsPanel() {
                     type="email"
                     name="fromEmail"
                     id="fromEmail"
-                    value="noreply@spendflow.com"
+                    value={settings.fromEmail}
+                    onChange={handleChange}
                     className="mt-1 block w-full rounded-md border-slate-700 bg-slate-900 text-white shadow-sm focus:border-amber-500 focus:ring-amber-500 sm:text-sm"
-                    disabled
                   />
+                  <p className="mt-1 text-xs text-slate-400">
+                    This email address will be used as the sender for all system emails
+                  </p>
                 </div>
               </div>
             </div>
