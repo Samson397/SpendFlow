@@ -46,9 +46,6 @@ class CategoryService {
           color: data.color,
           icon: data.icon,
           type: data.type,
-          userId: data.userId,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
         });
       });
 
@@ -148,9 +145,6 @@ class CategoryService {
     // Combine and return unique categories (user categories override defaults with same name)
     const combinedCategories: Category[] = defaultCategories.map(defaultCat => ({
       id: '', // Default categories don't have IDs
-      userId: '', // Default categories don't belong to a specific user
-      createdAt: new Date(),
-      updatedAt: new Date(),
       ...defaultCat,
     }));
 

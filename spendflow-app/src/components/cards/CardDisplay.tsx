@@ -16,8 +16,19 @@ export function CardDisplay({ card }: CardDisplayProps) {
   // Check expiry status
   const { isExpired, isExpiringSoon } = getCardExpiryStatus(card.expiryDate);
 
-  // Enhanced color schemes for different card types with better contrast
-  const getCardTheme = (cardType: string) => {
+  // Enhanced color schemes - use stored color or fall back to type-based themes
+  const getCardTheme = (card: CardType) => {
+    // If card has a custom color (any color that's not empty), use it
+    if (card.color && card.color.trim() !== '') {
+      const hexColor = card.color.startsWith('#') ? card.color : `#${card.color}`;
+      // Create a gradient using the selected color
+      return {
+        gradient: `linear-gradient(135deg, ${hexColor}cc 0%, ${hexColor} 50%, ${hexColor}aa 100%)`,
+        accent: hexColor
+      };
+    }
+
+    // Fall back to type-based themes
     const themes = {
       credit: {
         gradient: 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #a855f7 100%)',
@@ -36,14 +47,14 @@ export function CardDisplay({ card }: CardDisplayProps) {
         accent: '#475569'
       }
     };
-    return themes[cardType as keyof typeof themes] || themes.default;
+    return themes[card.type as keyof typeof themes] || themes.default;
   };
 
-  const theme = getCardTheme(card.type);
+  const theme = getCardTheme(card);
 
   return (
     <div
-      className="relative w-full h-56 rounded-3xl p-6 text-white shadow-2xl overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-3xl"
+      className="relative w-full h-56 sm:h-56 md:h-64 lg:h-72 rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-5 lg:p-6 text-white shadow-2xl overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-3xl"
       style={{
         background: theme.gradient,
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
@@ -60,58 +71,55 @@ export function CardDisplay({ card }: CardDisplayProps) {
 
       {/* Card content */}
       <div className="relative z-10 h-full flex flex-col justify-between">
-        {/* Top section */}
-        <div className="flex justify-between items-start">
+        {/* Top section - Compact grouped layout */}
+        <div className="space-y-1">
+          {/* Card Type and Name */}
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/90 uppercase tracking-widest font-medium">
+              {card.type === 'credit' ? 'Credit Card' : card.type === 'debit' ? 'Debit Card' : 'Card'} - ({card.name || card.type})
+            </div>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/30 rounded-full flex items-center justify-center backdrop-blur-sm shrink-0">
+              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+            </div>
+          </div>
+          {/* Expiry Date with label */}
+          <div className="text-xs text-white/80 uppercase tracking-widest font-medium">
+            Expires - ({expiryParts[0]}/{expiryParts[1]})
+          </div>
+        </div>
+
+        {/* Middle section - Card number and card holder */}
+        <div className="space-y-1 sm:space-y-2">
           <div>
-            <p className="text-xs text-white/90 uppercase tracking-widest font-medium">
-              {card.type === 'credit' ? 'Credit Card' : card.type === 'debit' ? 'Debit Card' : 'Card'}
+            <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Card Number</p>
+            <p className="text-xs sm:text-sm md:text-base font-mono tracking-[0.1em] sm:tracking-[0.12em] md:tracking-[0.15em] font-bold text-white break-all">{cardNumberDisplay}</p>
+            <p className="font-bold text-sm sm:text-base md:text-lg tracking-wide text-white truncate mt-1" title={card.cardHolder}>
+              {card.cardHolder || 'Card Holder'}
             </p>
-            <p className="text-lg font-bold capitalize tracking-wide text-white">{card.name || card.type}</p>
-          </div>
-          <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <CreditCard className="h-6 w-6 text-white" />
           </div>
         </div>
 
-        {/* Middle section - Card number and expiry */}
-        <div className="space-y-2">
-          <div>
-            <p className="text-xs text-white/90 mb-2 uppercase tracking-widest font-medium">Card Number</p>
-            <p className="text-xl font-mono tracking-[0.2em] font-bold text-white">{cardNumberDisplay}</p>
+        {/* Bottom section - Balance */}
+        <div className="flex justify-between items-end">
+          <div className="flex-1">
+            <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Balance</p>
+            <p className="font-bold text-sm sm:text-base md:text-lg lg:text-xl text-white">{formatCurrency(card.balance)}</p>
           </div>
-          <div>
-            <p className="text-xs text-white/90 mb-1 uppercase tracking-widest font-medium">Expires</p>
-            <p className="font-mono text-lg font-bold text-white">{expiryParts[0]}/{expiryParts[1]}</p>
-          </div>
-        </div>
-
-        {/* Bottom section - Card holder */}
-        <div>
-          <p className="text-xs text-white/90 mb-1 uppercase tracking-widest font-medium">Card Holder</p>
-          <p className="font-bold text-sm tracking-wide text-white">{card.cardHolder}</p>
+          {card.type === 'credit' && card.limit && (
+            <div className="text-right">
+              <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Limit</p>
+              <p className="font-bold text-sm sm:text-base md:text-lg lg:text-xl text-white">{formatCurrency(card.limit)}</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Expiry status indicator */}
+      {/* Expiry status indicator - Centered */}
       {(isExpired || isExpiringSoon) && (
-        <div className="absolute top-2 left-2 bg-white/40 backdrop-blur-xl rounded-xl px-3 py-1 border border-white/30 shadow-lg">
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/40 backdrop-blur-xl rounded-xl px-3 py-1 border border-white/30 shadow-lg z-10">
           <p className={`text-xs font-medium ${isExpired ? 'text-red-600' : 'text-orange-600'}`}>
             {isExpired ? 'EXPIRED' : 'EXPIRES SOON'}
           </p>
-        </div>
-      )}
-
-      {/* Enhanced balance badge - moved back to bottom-right */}
-      <div className="absolute bottom-2 right-2 bg-white/40 backdrop-blur-xl rounded-xl px-3 py-2 border border-white/30 shadow-lg">
-        <p className="text-xs text-slate-800 uppercase tracking-widest font-medium">Balance</p>
-        <p className="font-bold text-base text-slate-900">{formatCurrency(card.balance)}</p>
-      </div>
-
-      {/* Enhanced limit badge for credit cards - positioned based on expiry status */}
-      {card.type === 'credit' && card.limit && (
-        <div className={`absolute top-2 bg-white/40 backdrop-blur-xl rounded-xl px-3 py-2 border border-white/30 shadow-lg ${(isExpired || isExpiringSoon) ? 'right-16' : 'right-2'}`}>
-          <p className="text-xs text-slate-800 uppercase tracking-widest font-medium">Limit</p>
-          <p className="font-bold text-base text-slate-900">{formatCurrency(card.limit)}</p>
         </div>
       )}
     </div>

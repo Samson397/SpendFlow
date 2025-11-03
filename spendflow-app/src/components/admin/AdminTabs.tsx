@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Users, 
   BarChart3, 
@@ -70,6 +71,7 @@ export default function AdminTabs({ stats, onRefresh }: AdminTabsProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
 
   // Initialize activeTab from URL query parameter
   useEffect(() => {
@@ -110,8 +112,8 @@ export default function AdminTabs({ stats, onRefresh }: AdminTabsProps) {
 
       console.log('✅ Successfully signed out from Firebase');
 
-      // Force redirect to login page
-      window.location.href = '/login';
+      // Force redirect to login page using router
+      router.push('/login');
 
     } catch (error: unknown) {
       console.error('❌ Logout error:', error);
@@ -120,7 +122,7 @@ export default function AdminTabs({ stats, onRefresh }: AdminTabsProps) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/insufficient-permission') {
         console.warn('⚠️ Insufficient permission during logout - this may be expected');
         // Still try to redirect even if logout partially failed
-        window.location.href = '/login';
+        router.push('/login');
         return;
       }
 
@@ -137,7 +139,7 @@ export default function AdminTabs({ stats, onRefresh }: AdminTabsProps) {
         }
 
         // Force redirect
-        window.location.href = '/login';
+        router.push('/login');
 
       } catch (fallbackError) {
         console.error('❌ Fallback logout also failed:', fallbackError);
@@ -288,7 +290,7 @@ function DashboardPanel({ stats, setActiveTab, onRefresh }: {
   const { user } = useAuth();
 
   // Check if user is admin
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+  const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
   const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
   const getTimeAgo = (timestamp: Date) => {
@@ -318,7 +320,7 @@ function DashboardPanel({ stats, setActiveTab, onRefresh }: {
       try {
         // For non-admin users, only fetch their own alerts
         const alerts = await alertsService.getAll({
-          userId: isAdmin ? undefined : user?.uid
+          userId: isAdmin ? undefined : user?.uid || '',
         });
         
         const stats = {

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAccessControl } from '@/lib/services/accessControlService';
-import { Plus, Award, Crown } from 'lucide-react';
+import { Plus, Award } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
@@ -70,6 +70,15 @@ function DashboardContent() {
   // Check subscription limits and show warnings
   const checkSubscriptionLimits = useCallback(async () => {
     if (!user) return;
+
+    // Check if user is admin - admins don't have limits
+    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+    const isAdmin = user.email && adminEmails.includes(user.email);
+
+    if (isAdmin) {
+      setSubscriptionWarnings({ cards: false, transactions: false });
+      return;
+    }
 
     try {
       const cardCheck = await canAddCard();
@@ -236,20 +245,20 @@ function DashboardContent() {
       )}
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 tracking-wide">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 tracking-wide">
               D A S H B O A R D
             </h1>
             <p className="text-slate-400 text-sm tracking-widest uppercase">Financial Overview</p>
           </div>
           <button
             onClick={handleAddTransactionClick}
-            className="flex items-center gap-2 px-6 py-3 border border-(--theme-accent) text-(--theme-accent) hover:bg-(--theme-accent)/10 transition-colors tracking-wider uppercase text-sm"
+            className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 border border-(--theme-accent) text-(--theme-accent) hover:bg-(--theme-accent)/10 transition-colors tracking-wider uppercase text-sm w-full sm:w-auto justify-center"
           >
-            <Plus className="h-5 w-5" />
-            <span className="hidden sm:inline">Add Transaction</span>
-            <span className="sm:hidden">Add</span>
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="hidden xs:inline">Add Transaction</span>
+            <span className="xs:hidden">Add</span>
           </button>
         </div>
 
@@ -258,25 +267,68 @@ function DashboardContent() {
           <div className="flex items-center justify-between p-4 border border-slate-800 bg-slate-900/30 backdrop-blur-sm rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
-                <Crown className="h-5 w-5 text-white" />
+                <Award className="h-5 w-5 text-white" />
               </div>
               <div>
                 <div className="text-slate-100 font-medium">
-                  {tier === 'free' ? 'Essential' : tier === 'pro' ? 'Professional' : 'Enterprise'} Plan
+                  {(() => {
+                    // Check if user is admin
+                    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+                    const isAdmin = user?.email && adminEmails.includes(user.email);
+
+                    if (isAdmin) {
+                      return 'Administrator';
+                    }
+
+                    return tier === 'free' ? 'Essential' : tier === 'pro' ? 'Professional' : 'Enterprise';
+                  })()} Plan
                 </div>
                 <div className="text-slate-400 text-sm">
-                  {subscription?.currentPeriodEnd
-                    ? `Renews ${subscription.currentPeriodEnd.toLocaleDateString()}`
-                    : 'Free plan'
-                  }
+                  {(() => {
+                    // Check if user is admin
+                    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+                    const isAdmin = user?.email && adminEmails.includes(user.email);
+
+                    if (isAdmin) {
+                      return 'Unlimited access to all features';
+                    }
+
+                    return subscription?.currentPeriodEnd
+                      ? `Renews ${subscription.currentPeriodEnd.toLocaleDateString()}`
+                      : 'Free plan';
+                  })()}
                 </div>
               </div>
             </div>
             <button
               onClick={() => router.push('/subscription')}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-medium rounded-lg transition-colors text-sm"
+              className={`px-4 py-2 font-medium rounded-lg transition-colors text-sm ${
+                (() => {
+                  // Check if user is admin
+                  const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+                  const isAdmin = user?.email && adminEmails.includes(user.email);
+
+                  if (isAdmin) {
+                    return 'bg-purple-600 hover:bg-purple-700 text-white';
+                  }
+
+                  return tier === 'enterprise'
+                    ? 'bg-slate-600 hover:bg-slate-700 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-slate-900';
+                })()
+              }`}
             >
-              {tier === 'enterprise' ? 'Manage Plan' : 'Upgrade'}
+              {(() => {
+                // Check if user is admin
+                const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+                const isAdmin = user?.email && adminEmails.includes(user.email);
+
+                if (isAdmin) {
+                  return 'Admin Panel';
+                }
+
+                return tier === 'enterprise' ? 'Manage Plan' : 'Upgrade';
+              })()}
             </button>
           </div>
         </div>
@@ -302,17 +354,17 @@ function DashboardContent() {
         )}
 
         {/* Card Balance Grid */}
-        <div className="grid grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
           <button
             onClick={() => {
               setSelectedCardType('credit');
               setShowCardsModal(true);
             }}
-            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-blue-600/50 transition-colors text-left"
+            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-blue-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-(--theme-accent) pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Credit Cards</div>
-              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.creditBalance)}</div>
+            <div className="border-l-2 border-(--theme-accent) pl-4 sm:pl-6">
+              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Credit Cards</div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.creditBalance)}</div>
               <div className="text-slate-600 text-sm">{stats.creditCardCount} {stats.creditCardCount === 1 ? 'Card' : 'Cards'}</div>
             </div>
           </button>
@@ -322,36 +374,36 @@ function DashboardContent() {
               setSelectedCardType('debit');
               setShowCardsModal(true);
             }}
-            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
+            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-(--theme-accent) pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Debit Cards</div>
-              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.debitBalance)}</div>
+            <div className="border-l-2 border-(--theme-accent) pl-4 sm:pl-6">
+              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Debit Cards</div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.debitBalance)}</div>
               <div className="text-slate-600 text-sm">{stats.debitCardCount} {stats.debitCardCount === 1 ? 'Card' : 'Cards'}</div>
             </div>
           </button>
         </div>
 
         {/* Income/Expenses Stats */}
-        <div className="grid grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
           <button
             onClick={() => router.push('/income')}
-            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
+            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-green-600 pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Income</div>
-              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.income)}</div>
+            <div className="border-l-2 border-green-600 pl-4 sm:pl-6">
+              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Income</div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.income)}</div>
               <div className="text-slate-600 text-sm">Total Revenue</div>
             </div>
           </button>
 
           <button
             onClick={() => router.push('/expenses')}
-            className="border border-slate-800 bg-slate-900/50 p-8 backdrop-blur-sm hover:border-red-600/50 transition-colors text-left"
+            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-red-600/50 transition-colors text-left"
           >
-            <div className="border-l-2 border-red-600 pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-3 font-serif">Expenses</div>
-              <div className="text-3xl sm:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.expenses)}</div>
+            <div className="border-l-2 border-red-600 pl-4 sm:pl-6">
+              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Expenses</div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.expenses)}</div>
               <div className="text-slate-600 text-sm">Total Expenditure</div>
             </div>
           </button>
@@ -365,37 +417,37 @@ function DashboardContent() {
           </div>
 
           <div className="border border-slate-800 bg-slate-900/30 backdrop-blur-sm">
-            <div className="grid grid-cols-3 divide-x divide-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-800">
               <button
                 onClick={() => router.push('/cards')}
-                className="p-8 text-center hover:bg-slate-900/50 transition-colors"
+                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
               >
-                <div className="text-(--theme-accent) mb-3">
-                  <Award className="h-8 w-8 mx-auto" />
+                <div className="text-(--theme-accent) mb-2 sm:mb-3">
+                  <Award className="h-6 w-6 sm:h-8 sm:w-8 mx-auto" />
                 </div>
-                <div className="text-3xl font-serif text-slate-100 mb-2">{cards.length}</div>
+                <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2">{cards.length}</div>
                 <div className="text-slate-500 text-xs tracking-widest uppercase">Accounts</div>
               </button>
               <button
                 onClick={() => router.push('/savings')}
-                className="p-8 text-center hover:bg-slate-900/50 transition-colors"
+                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
               >
-                <div className="text-(--theme-accent) mb-3">
-                  <div className="text-3xl">◆</div>
+                <div className="text-(--theme-accent) mb-2 sm:mb-3">
+                  <div className="text-xl sm:text-3xl">◆</div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.savings)}</div>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.savings)}</div>
                 <div className="text-slate-500 text-xs tracking-widest uppercase">
                   {savingsAccounts.length} {savingsAccounts.length === 1 ? 'Account' : 'Accounts'}
                 </div>
               </button>
               <button
                 onClick={() => router.push('/transactions')}
-                className="p-8 text-center hover:bg-slate-900/50 transition-colors"
+                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
               >
-                <div className="text-(--theme-accent) mb-3">
-                  <div className="text-3xl">★</div>
+                <div className="text-(--theme-accent) mb-2 sm:mb-3">
+                  <div className="text-xl sm:text-3xl">★</div>
                 </div>
-                <div className="text-3xl font-serif text-slate-100 mb-2">{transactions.length}</div>
+                <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2">{transactions.length}</div>
                 <div className="text-slate-500 text-xs tracking-widest uppercase">Transactions</div>
               </button>
             </div>

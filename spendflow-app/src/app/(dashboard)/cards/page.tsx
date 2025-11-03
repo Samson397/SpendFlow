@@ -32,7 +32,7 @@ function CardsPageContent() {
           setCards(userCards);
         } catch (error) {
           console.error('Error loading cards:', error);
-          toast.error('Failed to load cards');
+          toast.error('Unable to load your cards. Please refresh the page or try again later.');
         } finally {
           setLoading(false);
         }
@@ -55,47 +55,66 @@ function CardsPageContent() {
   const handleAddCardClick = async () => {
     if (!user) return;
 
-    // Check if user can add a card based on their subscription
-    const accessResult = await canAddCard();
-
-    if (!accessResult.allowed) {
-      if (accessResult.upgradeRequired) {
-        toast.error(
-          accessResult.reason || 'Upgrade your plan to add more cards',
-          {
-            duration: 5000,
-            style: {
-              background: '#1e293b',
-              color: '#f1f5f9',
-              border: '1px solid #f59e0b',
-            },
-          }
-        );
-        // TODO: Add upgrade prompt/modal here
-      } else {
-        toast.error(accessResult.reason || 'Cannot add card at this time');
-      }
-      return;
-    }
-
+    // Open modal immediately without waiting for permission check
     setShowModal(true);
+
+    // Check permissions in background and close modal if not allowed
+    try {
+      const accessResult = await canAddCard();
+
+      if (!accessResult.allowed) {
+        setShowModal(false); // Close modal if not allowed
+
+        if (accessResult.upgradeRequired) {
+          toast.error(
+            accessResult.reason || 'You\'ve reached your card limit. Upgrade to add more cards to your SpendFlow account.',
+            {
+              duration: 5000,
+              style: {
+                background: '#1e293b',
+                color: '#f1f5f9',
+                border: '1px solid #f59e0b',
+              },
+            }
+          );
+          // TODO: Add upgrade prompt/modal here
+        } else {
+          toast.error(accessResult.reason || 'Unable to add cards at this time. Please check your account status or contact support.');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking card permissions:', error);
+      setShowModal(false);
+      toast.error('Unable to verify permissions. Please try again.');
+    }
   };
 
   const handleAddSuccess = async () => {
     setShowModal(false);
-    // Refresh cards after adding
+    // Refresh cards after adding - optimize by not awaiting
     if (user) {
-      const userCards = await cardsService.getByUserId(user.uid);
-      setCards(userCards);
+      cardsService.getByUserId(user.uid).then(userCards => {
+        setCards(userCards);
+      }).catch(error => {
+        console.error('Error refreshing cards after add:', error);
+        // Fallback: reload page or show error
+        window.location.reload();
+      });
     }
   };
 
   const handleEditSuccess = async () => {
     setShowEditModal(false);
-    // Refresh cards after editing
+    setSelectedCard(null);
+    // Refresh cards after editing - optimize by not awaiting
     if (user) {
-      const userCards = await cardsService.getByUserId(user.uid);
-      setCards(userCards);
+      cardsService.getByUserId(user.uid).then(userCards => {
+        setCards(userCards);
+      }).catch(error => {
+        console.error('Error refreshing cards after edit:', error);
+        // Fallback: reload page or show error
+        window.location.reload();
+      });
     }
   };
 
@@ -114,7 +133,7 @@ function CardsPageContent() {
         }
       } catch (error) {
         console.error('Error deleting card:', error);
-        toast.error('Failed to delete card');
+        toast.error('Unable to delete this card. Please try again or contact support if the problem persists.');
       }
     }
   };
@@ -176,33 +195,38 @@ function CardsPageContent() {
             <h2 className="text-lg sm:text-xl md:text-2xl font-serif text-slate-100 tracking-wide">Your Cards</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
             {cards.map((card) => (
-              <div key={card.id} className="relative group">
-                {/* Card Display */}
+              <div key={card.id} className="relative">
                 <CardDisplay card={card} />
                 
-                {/* Action Overlay */}
-                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out rounded-3xl flex items-center justify-center z-10">
-                  <div className="flex flex-col sm:flex-row gap-3 bg-black/50 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                {/* Action Buttons - Modern Design - Hidden when modals are open or sidebar is open */}
+                {!(showModal || showEditModal) && (
+                  <div className="absolute bottom-4 right-4 flex gap-2 z-20 md:z-50">
                     <button
-                      onClick={() => handleEditClick(card)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 ease-in-out flex items-center gap-2 border border-blue-500/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(card);
+                      }}
+                      className="group relative w-10 h-10 md:w-8 md:h-8 bg-white/20 md:bg-white/10 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 md:border-white/20 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation md:pointer-events-auto pointer-events-none md:opacity-100 opacity-0"
                       aria-label="Edit card"
                     >
-                      <Edit2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Edit</span>
+                      <Edit2 className="h-4 w-4 md:h-3 md:w-3 group-hover:scale-110 transition-transform duration-200" />
+                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-blue-500/30 to-purple-500/30 md:from-blue-500/20 md:to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                     </button>
                     <button
-                      onClick={() => handleDeleteClick(card.id)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 ease-in-out flex items-center gap-2 border border-red-500/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(card.id);
+                      }}
+                      className="group relative w-10 h-10 md:w-8 md:h-8 bg-white/20 md:bg-white/10 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 md:border-white/20 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation md:pointer-events-auto pointer-events-none md:opacity-100 opacity-0"
                       aria-label="Delete card"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Delete</span>
+                      <Trash2 className="h-4 w-4 md:h-3 md:w-3 group-hover:scale-110 transition-transform duration-200" />
+                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-red-500/30 to-orange-500/30 md:from-red-500/20 md:to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                     </button>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>

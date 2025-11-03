@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, PiggyBank, Banknote, ArrowRightLeft, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import { SavingsAccount } from '@/types';
 import { savingsAccountsService } from '@/lib/services/savingsService';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -31,6 +31,8 @@ export function SavingsAccountsList() {
   }, [user]);
 
   const loadAccounts = async () => {
+    if (!user) return;
+    
     try {
       setIsLoading(true);
       const userAccounts = await savingsAccountsService.getUserAccounts(user.uid);

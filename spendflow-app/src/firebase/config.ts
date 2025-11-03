@@ -15,10 +15,10 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Validate that all required environment variables are present
+// Basic validation - check for essential config
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
   throw new Error(
-    'Missing Firebase configuration. Please check your .env.local file and ensure all NEXT_PUBLIC_FIREBASE_* variables are set.'
+    'Missing Firebase configuration. Please check your environment variables.'
   );
 }
 

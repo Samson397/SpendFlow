@@ -12,7 +12,6 @@ interface Transaction {
   category: string;
   description?: string;
   type?: string;
-  isAd?: never;
 }
 
 interface Ad {
@@ -67,7 +66,8 @@ export default function AdsDemoPage() {
   });
 
   // Add one more ad at the end if needed
-  if (contentWithAds.length > 0 && !contentWithAds[contentWithAds.length - 1].isAd) {
+  const lastItem = contentWithAds[contentWithAds.length - 1];
+  if (contentWithAds.length > 0 && !('isAd' in lastItem && lastItem.isAd)) {
     contentWithAds.push({ isAd: true, id: 'ad-end' });
   }
 
@@ -222,7 +222,7 @@ export default function AdsDemoPage() {
                   </div>
                 ) : (
                   contentWithAds.map((item, index) =>
-                    item.isAd ? (
+                    'isAd' in item && item.isAd ? (
                       <div key={item.id} className="p-4 bg-gray-50 border-t border-b border-gray-200">
                         <div className="text-xs text-gray-500 mb-2">Advertisement</div>
                         <AdBanner size="medium" className="mx-auto" />
@@ -235,17 +235,17 @@ export default function AdsDemoPage() {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
                             <span className="text-blue-600 font-medium">
-                              {item.name.charAt(0)}
+                              {(item as Transaction).name.charAt(0)}
                             </span>
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                            <div className="text-sm text-gray-500">{item.category}</div>
+                            <div className="text-sm font-medium text-gray-900">{(item as Transaction).name}</div>
+                            <div className="text-sm text-gray-500">{(item as Transaction).category}</div>
                           </div>
                         </div>
                         <div className="ml-4 text-right">
-                          <div className="text-sm font-medium text-gray-900">{item.amount}</div>
-                          <div className="text-xs text-gray-500">{item.date}</div>
+                          <div className="text-sm font-medium text-gray-900">{(item as Transaction).amount}</div>
+                          <div className="text-xs text-gray-500">{(item as Transaction).date}</div>
                         </div>
                       </div>
                     )

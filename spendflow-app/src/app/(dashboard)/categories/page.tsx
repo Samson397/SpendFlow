@@ -284,10 +284,11 @@ function CategoryModal({
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Name */}
             <div>
-              <label className="block text-slate-400 text-sm font-medium mb-2">
+              <label htmlFor="category-name" className="block text-slate-400 text-sm font-medium mb-2">
                 Category Name
               </label>
               <input
+                id="category-name"
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -302,7 +303,7 @@ function CategoryModal({
               <label className="block text-slate-400 text-sm font-medium mb-3">
                 Color
               </label>
-              <div className="grid grid-cols-5 gap-3">
+              <div id="category-color" className="grid grid-cols-5 gap-3">
                 {colorOptions.map((color) => (
                   <button
                     key={color}
@@ -324,7 +325,7 @@ function CategoryModal({
               <label className="block text-slate-400 text-sm font-medium mb-3">
                 Icon
               </label>
-              <div className="grid grid-cols-5 gap-3">
+              <div id="category-icon" className="grid grid-cols-5 gap-3">
                 {iconOptions.map((icon) => (
                   <button
                     key={icon}

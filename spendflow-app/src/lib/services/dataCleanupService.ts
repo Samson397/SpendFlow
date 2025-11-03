@@ -188,7 +188,11 @@ export class DataCleanupService {
     documentCount: number;
     type: 'user_data' | 'system_data';
   }[]> {
-    const summary = [];
+    const summary: {
+      collection: string;
+      documentCount: number;
+      type: 'user_data' | 'system_data';
+    }[] = [];
 
     const allCollections = [...USER_DATA_COLLECTIONS, ...SYSTEM_COLLECTIONS];
 

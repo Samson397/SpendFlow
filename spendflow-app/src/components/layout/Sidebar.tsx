@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon, CpuChipIcon, BoltIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
@@ -10,12 +10,13 @@ import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { CurrencySelector } from '../currency/CurrencySelector';
 import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 type NavItem = {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
+  premiumOnly?: boolean;
 };
 
 const userNavigation: NavItem[] = [
@@ -27,6 +28,7 @@ const userNavigation: NavItem[] = [
   { name: 'Categories', href: '/categories', icon: TagIcon },
   { name: 'Savings', href: '/savings', icon: BuildingLibraryIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
+  { name: 'AI Assistant', href: '/ai', icon: BoltIcon },
   { name: 'Subscription', href: '/subscription', icon: SparklesIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
 ];
@@ -35,6 +37,8 @@ const adminNavigation: NavItem[] = [
   { name: 'Admin Dashboard', href: '/admin', icon: ShieldCheckIcon },
   { name: 'User Management', href: '/admin/users', icon: UserIcon },
   { name: 'System Alerts', href: '/admin/alerts', icon: TagIcon },
+  { name: 'Setup', href: '/setup', icon: SparklesIcon },
+  { name: 'Admin Setup', href: '/setup-admin', icon: ShieldCheckIcon },
   { name: 'Settings', href: '/admin/settings', icon: SparklesIcon },
 ];
 
@@ -45,13 +49,18 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const { tier } = useSubscription();
+
+  // Debug subscription tier
+  console.log('🎯 Sidebar - Subscription tier:', tier);
+  console.log('🎯 Sidebar - User:', user?.email);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Calculate admin status using useMemo to avoid setState in useEffect
   const isAdmin = useMemo(() => {
     if (user) {
       // Use same admin check logic as AuthContext - supports multiple admins
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+      const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
       const userIsAdmin = user.email ? adminEmails.includes(user.email) : false;
 
       console.log('Sidebar admin check:', {
@@ -78,8 +87,8 @@ export default function Sidebar() {
 
       console.log('✅ Successfully signed out from sidebar');
 
-      // Force redirect to login page
-      window.location.href = '/login';
+      // Force redirect to login page using router
+      router.push('/login');
 
     } catch (error: unknown) {
       console.error('❌ Sidebar logout error:', error);
@@ -93,7 +102,7 @@ export default function Sidebar() {
       console.error(`${friendlyError.title}: ${friendlyError.message}`);
 
       // For sidebar, we don't show toast, just redirect
-      window.location.href = '/login';
+      router.push('/login');
     }
   };
 
@@ -102,10 +111,22 @@ export default function Sidebar() {
   };
 
   const renderNavLinks = () => {
-    // Use different navigation based on admin status
-    const currentNavigation = isAdmin ? adminNavigation : userNavigation;
+    // For admins, show both user and admin navigation
+    const currentNavigation = isAdmin ? [...userNavigation, ...adminNavigation] : userNavigation;
 
-    const links = currentNavigation.map((item) => {
+    // Filter navigation based on subscription tier
+    const filteredNavigation = currentNavigation.filter((item) => {
+      // Hide premium-only items from free users
+      console.log('🎯 Sidebar filtering:', { tier, itemName: item.name, premiumOnly: item.premiumOnly });
+
+      if (item.premiumOnly && tier === 'free') {
+        console.log('❌ Hiding premium item:', item.name);
+        return false;
+      }
+      return true;
+    });
+
+    const links = filteredNavigation.map((item) => {
       const isActive = pathname === item.href;
       return (
         <Link

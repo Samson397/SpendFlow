@@ -19,7 +19,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { 
-  Users, 
   CreditCard, 
   MessageSquare, 
   Settings,
@@ -288,6 +287,10 @@ export default function AdminPage() {
       // Extract values from results with detailed error logging
       const extractResult = (index: number, name: string) => {
         const result = results[index];
+        if (!result) {
+          console.error(`No result at index ${index} for ${name}`);
+          return 0;
+        }
         if (result.status === 'fulfilled') {
           console.log(`${name} count:`, result.value);
           return result.value;
@@ -383,7 +386,7 @@ export default function AdminPage() {
 
       try {
         // Quick admin check
-        const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+        const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
         const isUserAdmin = user.email ? adminEmails.includes(user.email) : false;
 
         if (!isMounted) return;

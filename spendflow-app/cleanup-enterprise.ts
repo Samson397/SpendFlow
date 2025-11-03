@@ -6,16 +6,16 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
 
 // Firebase config - load from environment
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env['NEXT_PUBLIC_FIREBASE_API_KEY']!,
+  authDomain: process.env['NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN']!,
+  projectId: process.env['NEXT_PUBLIC_FIREBASE_PROJECT_ID']!,
+  storageBucket: process.env['NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET']!,
+  messagingSenderId: process.env['NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID']!,
+  appId: process.env['NEXT_PUBLIC_FIREBASE_APP_ID']!,
 };
 
 // Initialize Firebase
@@ -42,7 +42,8 @@ async function cleanupInvalidEnterpriseSubscriptions() {
 
     for (const planDoc of enterprisePlans.docs) {
       const planId = planDoc.id;
-      console.log(`🔍 Checking subscriptions for enterprise plan: ${planDoc.data().displayName}`);
+      const planData = planDoc.data();
+      console.log(`🔍 Checking subscriptions for enterprise plan: ${planData['displayName'] || 'Unnamed Plan'}`);
 
       // Find all user subscriptions with this enterprise plan
       const userSubscriptionsQuery = query(
@@ -56,21 +57,21 @@ async function cleanupInvalidEnterpriseSubscriptions() {
         const subscriptionData = subDoc.data();
 
         // Check if this is a legitimate enterprise subscription
-        const hasValidEnterpriseAccess = subscriptionData.status === 'active' &&
-                                       subscriptionData.stripeSubscriptionId &&
-                                       !subscriptionData.cancelAtPeriodEnd;
+        const hasValidEnterpriseAccess = subscriptionData['status'] === 'active' &&
+                                       subscriptionData['stripeSubscriptionId'] &&
+                                       !subscriptionData['cancelAtPeriodEnd'];
 
         if (!hasValidEnterpriseAccess) {
-          console.log(`❌ Invalid enterprise subscription found for user: ${subscriptionData.userId}`);
-          console.log(`   Status: ${subscriptionData.status}`);
-          console.log(`   Stripe ID: ${subscriptionData.stripeSubscriptionId || 'None'}`);
-          console.log(`   Cancel at period end: ${subscriptionData.cancelAtPeriodEnd}`);
+          console.log(`❌ Invalid enterprise subscription found for user: ${subscriptionData['userId']}`);
+          console.log(`   Status: ${subscriptionData['status']}`);
+          console.log(`   Stripe ID: ${subscriptionData['stripeSubscriptionId'] || 'None'}`);
+          console.log(`   Cancel at period end: ${subscriptionData['cancelAtPeriodEnd']}`);
 
           // Remove the invalid subscription
           await deleteDoc(doc(db, 'userSubscriptions', subDoc.id));
           console.log(`   ✅ Removed invalid enterprise subscription\n`);
         } else {
-          console.log(`✅ Valid enterprise subscription for user: ${subscriptionData.userId}\n`);
+          console.log(`✅ Valid enterprise subscription for user: ${subscriptionData['userId']}\n`);
         }
       }
     }

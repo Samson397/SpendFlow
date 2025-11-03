@@ -43,6 +43,13 @@ export default function Home() {
                     About
                   </Link>
                   <Link
+                    href="/contact"
+                    className="hidden sm:inline-flex items-center px-4 py-2 text-sm font-medium text-slate-300 hover:text-amber-400 transition-colors h-[44px]"
+                    aria-label="Contact SpendFlow"
+                  >
+                    Contact
+                  </Link>
+                  <Link
                     href="/dashboard"
                     className="px-3 sm:px-4 py-2 text-sm sm:text-base border border-amber-600 text-amber-400 bg-amber-900/10 hover:bg-amber-600/20 font-medium tracking-wide transition-all rounded-md min-h-[44px] flex items-center justify-center"
                     aria-label="Go to dashboard"
@@ -61,6 +68,13 @@ export default function Home() {
                     aria-label="About SpendFlow"
                   >
                     About
+                  </Link>
+                  <Link
+                    href="/contact"
+                    className="hidden sm:inline-flex items-center px-4 py-2 text-sm font-medium text-slate-300 hover:text-amber-400 transition-colors h-[44px]"
+                    aria-label="Contact SpendFlow"
+                  >
+                    Contact
                   </Link>
                   <Link
                     href="/login"

@@ -25,7 +25,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     console.log('🔧 Setting up real-time maintenance mode monitoring');
 
     // Check if user is admin (admins can bypass maintenance mode)
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
     const isAdmin = user.email ? adminEmails.includes(user.email) : false;
 
     // Set up real-time listener for maintenance mode changes
@@ -89,6 +89,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     } else {
       console.log('No user authenticated');
     }
+    return () => {}; // Return empty cleanup function
   }, [user]);
 
   return (

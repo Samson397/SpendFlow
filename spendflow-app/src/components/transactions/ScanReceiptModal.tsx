@@ -66,16 +66,24 @@ export function ScanReceiptModal({ isOpen, onClose, onDataExtracted }: ScanRecei
         setTimeout(() => reject(new Error('Scan timeout')), 30000)
       );
 
-      const data = await Promise.race([scanPromise, timeoutPromise]);
+      const data = await Promise.race([scanPromise, timeoutPromise]) as {
+        amount?: number;
+        merchant?: string;
+        date?: string;
+        category?: string;
+      };
       console.log('Scan complete, data:', data);
       
+      // Create a mutable copy for modification
+      const mutableData = { ...data };
+      
       // Set default date to today if not found
-      if (!data.date) {
-        data.date = new Date().toISOString().split('T')[0];
+      if (!mutableData.date) {
+        mutableData.date = new Date().toISOString().split('T')[0];
       }
       
-      setExtractedData(data);
-      console.log('Extracted data set:', data);
+      setExtractedData(mutableData);
+      console.log('Extracted data set:', mutableData);
       
     } catch (err) {
       console.error('Receipt scan error:', err);

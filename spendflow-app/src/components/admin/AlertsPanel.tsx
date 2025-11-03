@@ -38,7 +38,7 @@ export default function AlertsPanel() {
   }, []);
 
   // Check if user is admin
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+  const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
   const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
   // Filter alerts based on search and filters using useMemo

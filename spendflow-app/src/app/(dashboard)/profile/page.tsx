@@ -7,7 +7,6 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { SubscriptionManager } from '@/components/subscription/SubscriptionManager';
 import { DataExport } from '@/components/export/DataExport';
 import { AdvancedAnalytics } from '@/components/analytics/AdvancedAnalytics';
-import { SupportTickets } from '@/components/support/SupportTickets';
 import { TeamCollaboration } from '@/components/team/TeamCollaboration';
 import { UserAdminMessaging } from '@/components/messaging/UserAdminMessaging';
 import { DeviceManagement } from '@/components/profile/DeviceManagement';
@@ -213,11 +212,6 @@ function ProfilePageContent() {
       {/* Advanced Analytics */}
       <div className="max-w-4xl mx-auto">
         <AdvancedAnalytics key={analyticsKey} />
-      </div>
-
-      {/* Priority Support */}
-      <div className="max-w-4xl mx-auto">
-        <SupportTickets />
       </div>
 
       {/* Team Collaboration */}

@@ -7,6 +7,7 @@ import { categoryService } from '@/lib/services/categoryService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { ScanReceiptModal } from './ScanReceiptModal';
+import { getCardExpiryStatus } from '@/lib/utils/cardExpiry';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -61,9 +62,17 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
   const loadCards = async () => {
     try {
       const data = await cardsService.getByUserId(user!.uid);
-      setCards(data);
-      if (data.length > 0) {
-        setFormData(prev => ({ ...prev, cardId: data[0].id }));
+      
+      // Filter out expired cards - only show valid cards for transactions
+      const validCards = data.filter(card => {
+        if (!card.expiryDate) return true; // Keep cards without expiry date
+        const { isExpired } = getCardExpiryStatus(card.expiryDate);
+        return !isExpired; // Only keep non-expired cards
+      });
+      
+      setCards(validCards);
+      if (validCards.length > 0) {
+        setFormData(prev => ({ ...prev, cardId: validCards[0].id }));
       }
     } catch (error) {
       console.error('Error loading cards:', error);
@@ -183,7 +192,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
       />
       
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div className="bg-slate-950 border border-amber-700/30 rounded-lg max-w-sm w-full shadow-2xl">
+        <div className="bg-slate-950 border border-amber-700/30 rounded-lg w-full max-w-sm sm:max-w-md">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-slate-800">
             <div className="flex items-center gap-3">
@@ -313,7 +322,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
             >
               {cards.length === 0 ? (
-                <option value="">No cards available</option>
+                <option value="">No valid cards available (expired cards are hidden)</option>
               ) : (
                 cards.map((card) => (
                   <option key={card.id} value={card.id}>
@@ -352,7 +361,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
               disabled={loading || cards.length === 0}
               className="flex-1 px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Adding...' : 'Add Transaction'}
+              {loading ? 'Adding...' : cards.length === 0 ? 'No Valid Cards' : 'Add Transaction'}
             </button>
           </div>
         </form>

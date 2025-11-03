@@ -33,13 +33,13 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🚀 Form submit triggered');
+
     if (!user) {
-      console.log('❌ No user found');
+      toast.error('You must be logged in to add cards');
       return;
     }
 
-    // Validation
+    // Basic validation
     if (!formData.name.trim()) {
       toast.error('Please enter a card name');
       return;
@@ -59,6 +59,21 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
     const expiryRegex = /^(0[1-9]|1[0-2])\/([0-9]{2})$/;
     if (!expiryRegex.test(formData.expiryDate)) {
       toast.error('Please enter expiry date in MM/YY format (e.g., 12/25)');
+      return;
+    }
+
+    // Validate expiry date is not in the past
+    const [month, year] = formData.expiryDate.split('/').map(Number);
+    const expiryYear = 2000 + year;
+    const expiryDate = new Date(expiryYear, month - 1);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    if (expiryDate < new Date(currentYear, currentMonth)) {
+      const errorMsg = 'Card expiry date cannot be in the past. Please enter a valid future expiry date.';
+      toast.error(errorMsg);
+      alert(errorMsg);
       return;
     }
 
@@ -92,17 +107,12 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
       // Check for duplicate cards
       const existingCards = await cardsService.getByUserId(user.uid);
-      console.log('🔍 Duplicate check:', {
-        existingCards: existingCards.length,
-        lastFourToCheck: formData.lastFour,
-        existingLastFours: existingCards.map(card => card.lastFour)
-      });
-
       const duplicateCard = existingCards.find(card => card.lastFour === formData.lastFour);
 
       if (duplicateCard) {
-        console.log('❌ Duplicate card found:', duplicateCard);
-        toast.error(`A card ending in ${formData.lastFour} already exists. Please check your cards or enter different digits.`);
+        const errorMsg = `A card ending in ${formData.lastFour} already exists. Please check your cards or enter different digits.`;
+        toast.error(errorMsg);
+        alert(errorMsg);
         return;
       }
 
@@ -111,7 +121,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         name: formData.name,
         lastFour: formData.lastFour,
         cardNumber: `****${formData.lastFour}`,
-        cardHolder: user.displayName || 'Card Holder',
+        cardHolder: user.displayName || user.email?.split('@')[0] || 'Card Holder',
         expiryDate: formData.expiryDate,
         cvv: '***',
         balance: parseFloat(formData.balance) || 0,
@@ -172,10 +182,11 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Card Name */}
           <div>
-            <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+            <label htmlFor="card-name" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
               Card Name
             </label>
             <input
+              id="card-name"
               type="text"
               required
               value={formData.name}
@@ -218,10 +229,11 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
           {/* Last Four Digits */}
           <div>
-            <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+            <label htmlFor="last-four" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
               Last 4 Digits
             </label>
             <input
+              id="last-four"
               type="text"
               required
               maxLength={4}
@@ -234,10 +246,11 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
           {/* Expiry Date */}
           <div>
-            <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+            <label htmlFor="expiry-date" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
               Expiry Date
             </label>
             <input
+              id="expiry-date"
               type="text"
               required
               maxLength={5}
@@ -258,12 +271,13 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
           {/* Balance */}
           <div>
-            <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+            <label htmlFor="balance" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
               Current Balance
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{currency.symbol}</span>
               <input
+                id="balance"
                 type="number"
                 step="0.01"
                 required
@@ -280,12 +294,13 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
             <>
               {/* Credit Limit */}
               <div>
-                <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                <label htmlFor="credit-limit" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
                   Credit Limit
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{currency.symbol}</span>
                   <input
+                    id="credit-limit"
                     type="number"
                     step="100"
                     value={formData.creditLimit}
@@ -299,10 +314,11 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
               {/* Statement Day */}
               <div>
-                <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                <label htmlFor="statement-day" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
                   Statement Day
                 </label>
                 <select
+                  id="statement-day"
                   value={formData.statementDay}
                   onChange={(e) => setFormData({ ...formData, statementDay: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
@@ -318,10 +334,11 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
               {/* Payment Due Day */}
               <div>
-                <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                <label htmlFor="payment-due-day" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
                   Payment Due Day
                 </label>
                 <select
+                  id="payment-due-day"
                   value={formData.paymentDueDay}
                   onChange={(e) => setFormData({ ...formData, paymentDueDay: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
@@ -352,6 +369,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
                     formData.color === color ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950' : ''
                   }`}
                   style={{ backgroundColor: color }}
+                  aria-label={`Select ${color} color`}
                 />
               ))}
             </div>

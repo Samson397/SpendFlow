@@ -252,9 +252,9 @@ export default function UserManagement() {
         if (user.id === userId) {
           // Update both subscription tier and features based on the new tier
           const features = {
-            free: { maxCards: 2, maxTransactions: 100, analytics: false, export: false, prioritySupport: false },
-            pro: { maxCards: 10, maxTransactions: 1000, analytics: true, export: true, prioritySupport: false },
-            enterprise: { maxCards: 50, maxTransactions: 10000, analytics: true, export: true, prioritySupport: true }
+            free: { maxCards: 2, maxTransactions: 100, analytics: false, export: false, prioritySupport: false, apiAccess: false, teamManagement: false, customIntegrations: false },
+            pro: { maxCards: 10, maxTransactions: 1000, analytics: true, export: true, prioritySupport: false, apiAccess: false, teamManagement: false, customIntegrations: false },
+            enterprise: { maxCards: 50, maxTransactions: 10000, analytics: true, export: true, prioritySupport: true, apiAccess: true, teamManagement: true, customIntegrations: true }
           };
 
           return {
@@ -734,7 +734,7 @@ export default function UserManagement() {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
                         <button
                           onClick={() => {
                             if (selectedUser) {
@@ -747,8 +747,8 @@ export default function UserManagement() {
                               : 'border-gray-600 text-gray-400 hover:bg-gray-600/20'
                           }`}
                         >
-                          <User className="h-4 w-4 mr-1" />
-                          Free
+                          <User className="h-4 w-4 xs:mr-1" />
+                          <span className="hidden xs:inline">Free</span>
                         </button>
                         <button
                           onClick={() => {
@@ -762,8 +762,8 @@ export default function UserManagement() {
                               : 'border-blue-600 text-blue-400 hover:bg-blue-600/20'
                           }`}
                         >
-                          <Star className="h-4 w-4 mr-1" />
-                          Pro
+                          <Star className="h-4 w-4 xs:mr-1" />
+                          <span className="hidden xs:inline">Pro</span>
                         </button>
                         <button
                           onClick={() => {
@@ -777,8 +777,8 @@ export default function UserManagement() {
                               : 'border-amber-600 text-amber-400 hover:bg-amber-600/20'
                           }`}
                         >
-                          <Crown className="h-4 w-4 mr-1" />
-                          Enterprise
+                          <Crown className="h-4 w-4 xs:mr-1" />
+                          <span className="hidden xs:inline">Enterprise</span>
                         </button>
                       </div>
                     </div>

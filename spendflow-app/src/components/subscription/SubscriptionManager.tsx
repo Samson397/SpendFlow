@@ -1,12 +1,61 @@
 'use client';
 
-import { useState } from 'react';
-import { Crown, Calendar, CreditCard, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Crown, Calendar, CreditCard, AlertTriangle, CheckCircle, XCircle, TrendingUp, AlertCircle } from 'lucide-react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { usageService, UsageStats } from '@/lib/services/usageService';
 
 export function SubscriptionManager() {
   const { tier, subscription, theme, cancelSubscription, reactivateSubscription, upgradeToTier } = useSubscription();
+  const { user } = useAuth();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [usageLimits, setUsageLimits] = useState<{
+    cardsNearLimit: boolean;
+    transactionsNearLimit: boolean;
+    cardsAtLimit: boolean;
+    transactionsAtLimit: boolean;
+  } | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsageData = async () => {
+      if (!user) return;
+
+      try {
+        setUsageLoading(true);
+        const [stats, limits] = await Promise.all([
+          usageService.getCurrentMonthUsage(user.uid),
+          usageService.checkUsageLimits(user.uid, {
+            maxCards: theme.maxCards,
+            maxTransactions: theme.maxTransactions
+          })
+        ]);
+
+        setUsageStats(stats);
+        setUsageLimits(limits);
+      } catch (error) {
+        console.error('Error fetching usage data:', error);
+      } finally {
+        setUsageLoading(false);
+      }
+    };
+
+    fetchUsageData();
+  }, [user, theme.maxCards, theme.maxTransactions]);
+
+  const getUsageLimitColor = (isNearLimit: boolean, isAtLimit: boolean) => {
+    if (isAtLimit) return 'text-red-400';
+    if (isNearLimit) return 'text-amber-400';
+    return 'text-green-400';
+  };
+
+  const getUsageLimitIcon = (isNearLimit: boolean, isAtLimit: boolean) => {
+    if (isAtLimit) return <XCircle className="h-4 w-4" />;
+    if (isNearLimit) return <AlertTriangle className="h-4 w-4" />;
+    return <CheckCircle className="h-4 w-4" />;
+  };
 
   if (!subscription) {
     return (
@@ -142,30 +191,72 @@ export function SubscriptionManager() {
 
       {/* Usage Stats */}
       <div className="bg-slate-900/50 border border-slate-800 backdrop-blur-sm p-6 rounded-lg">
-        <h4 className="text-slate-300 font-semibold mb-4">Usage This Month</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-serif text-slate-100 mb-1">2</div>
-            <div className="text-slate-400 text-sm">Cards Used</div>
-            <div className="text-slate-500 text-xs">
-              {theme.maxCards === -1 ? 'Unlimited' : `of ${theme.maxCards}`}
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-slate-300 font-semibold">Usage This Month</h4>
+          {usageLimits && (usageLimits.cardsNearLimit || usageLimits.transactionsNearLimit) && (
+            <div className="flex items-center gap-2 text-amber-400 text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              <span>Near limit</span>
             </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-serif text-slate-100 mb-1">47</div>
-            <div className="text-slate-400 text-sm">Transactions</div>
-            <div className="text-slate-500 text-xs">
-              {theme.maxTransactions === -1 ? 'Unlimited' : `of ${theme.maxTransactions}`}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-serif text-slate-100 mb-1">12</div>
-            <div className="text-slate-400 text-sm">Reports Generated</div>
-            <div className="text-slate-500 text-xs">
-              {theme.analytics ? 'Analytics enabled' : 'Upgrade for analytics'}
-            </div>
-          </div>
+          )}
         </div>
+
+        {usageLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-amber-500"></div>
+          </div>
+        ) : usageStats ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className={`text-2xl font-serif mb-1 flex items-center justify-center gap-2 ${
+                usageLimits ? getUsageLimitColor(usageLimits.cardsNearLimit, usageLimits.cardsAtLimit) : 'text-slate-100'
+              }`}>
+                {usageLimits && getUsageLimitIcon(usageLimits.cardsNearLimit, usageLimits.cardsAtLimit)}
+                {usageStats.cardsUsed}
+              </div>
+              <div className="text-slate-400 text-sm">Cards Used</div>
+              <div className="text-slate-500 text-xs">
+                {theme.maxCards === -1 ? 'Unlimited' : `of ${theme.maxCards}`}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <div className={`text-2xl font-serif mb-1 flex items-center justify-center gap-2 ${
+                usageLimits ? getUsageLimitColor(usageLimits.transactionsNearLimit, usageLimits.transactionsAtLimit) : 'text-slate-100'
+              }`}>
+                {usageLimits && getUsageLimitIcon(usageLimits.transactionsNearLimit, usageLimits.transactionsAtLimit)}
+                {usageStats.transactionsCount}
+              </div>
+              <div className="text-slate-400 text-sm">Transactions</div>
+              <div className="text-slate-500 text-xs">
+                {theme.maxTransactions === -1 ? 'Unlimited' : `of ${theme.maxTransactions}`}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-2xl font-serif text-slate-100 mb-1">
+                {usageStats.reportsGenerated}
+              </div>
+              <div className="text-slate-400 text-sm">Reports Generated</div>
+              <div className="text-slate-500 text-xs">
+                {theme.analytics ? 'Analytics enabled' : 'Upgrade for analytics'}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-slate-400">Unable to load usage data</div>
+          </div>
+        )}
+
+        {usageLimits && (usageLimits.cardsAtLimit || usageLimits.transactionsAtLimit) && (
+          <div className="mt-4 p-3 bg-red-900/20 border border-red-700/50 rounded-md">
+            <div className="flex items-center gap-2 text-red-400 text-sm">
+              <AlertCircle className="h-4 w-4" />
+              <span>You've reached your plan limits. Consider upgrading for more usage.</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cancel Confirmation Modal */}

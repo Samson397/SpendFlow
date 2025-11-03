@@ -1,6 +1,8 @@
 'use client';
 
+import { SavingsAccount, Card } from '@/types';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,15 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { savingsAccountsService } from '@/lib/services/savingsService';
 import { cardsService } from '@/lib/services/cardsService';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 const transferSchema = z.object({
   fromAccountType: z.enum(['card', 'savings']),
-  fromAccountId: z.string().min(1, 'Please select an account').refine(val => val !== 'no-accounts', 'No accounts available for selection'),
+  fromAccountId: z.string().min(1, 'Please select an account'),
   toAccountType: z.enum(['card', 'savings']),
-  toAccountId: z.string().min(1, 'Please select an account').refine(val => val !== 'no-accounts', 'No accounts available for selection'),
-  amount: z.coerce.number().positive('Amount must be greater than 0'),
+  toAccountId: z.string().min(1, 'Please select an account'),
+  amount: z.number().positive('Amount must be greater than 0'),
   description: z.string().optional(),
 });
 
@@ -36,8 +37,8 @@ export function TransferDialog({ open, onOpenChange, onSuccess }: TransferDialog
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [savingsAccounts, setSavingsAccounts] = useState([]);
-  const [cards, setCards] = useState([]);
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
   
   const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = useForm<TransferFormData>({
     resolver: zodResolver(transferSchema),
@@ -59,6 +60,8 @@ export function TransferDialog({ open, onOpenChange, onSuccess }: TransferDialog
   }, [user]);
 
   const loadAccounts = async () => {
+    if (!user) return;
+    
     try {
       const [savings, userCards] = await Promise.all([
         savingsAccountsService.getUserAccounts(user.uid),
@@ -157,12 +160,19 @@ export function TransferDialog({ open, onOpenChange, onSuccess }: TransferDialog
       );
     }
     
-    return accounts.map(account => (
-      <SelectItem key={account.id} value={account.id}>
-        {account.name || `${type === 'card' ? 'Card' : 'Account'} •••• ${account.lastFour || account.accountNumber?.slice(-4)}`}
-        {account.balance !== undefined && ` (${formatCurrency(account.balance, account.currency || 'USD')})`}
-      </SelectItem>
-    ));
+    return accounts.map(account => {
+      const isCard = type === 'card';
+      const lastFour = isCard && 'lastFour' in account ? account.lastFour : 
+                      !isCard && 'accountNumber' in account ? account.accountNumber?.slice(-4) : '';
+      const currency = isCard ? 'USD' : ('currency' in account ? account.currency : 'USD');
+      
+      return (
+        <SelectItem key={account.id} value={account.id}>
+          {account.name || `${type === 'card' ? 'Card' : 'Account'} •••• ${lastFour}`}
+          {account.balance !== undefined && ` (${formatCurrency(account.balance, currency)})`}
+        </SelectItem>
+      );
+    });
   };
 
   return (
@@ -203,7 +213,6 @@ export function TransferDialog({ open, onOpenChange, onSuccess }: TransferDialog
                       setValue('fromAccountId', value);
                     }
                   }}
-                  className="col-span-2"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={`Select ${fromAccountType} account`} />
@@ -257,7 +266,6 @@ export function TransferDialog({ open, onOpenChange, onSuccess }: TransferDialog
                       setValue('toAccountId', value);
                     }
                   }}
-                  className="col-span-2"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={`Select ${toAccountType} account`} />

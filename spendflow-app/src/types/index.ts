@@ -4,6 +4,7 @@ export * from './subscription';
 // Legacy exports for backward compatibility
 export type { SubscriptionInfo } from './subscription';
 export type { PlanLimits } from './subscription';
+export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
 
 export interface UserProfile {
   id: string;
@@ -16,13 +17,41 @@ export interface UserProfile {
   disabled?: boolean;
   emailVerified?: boolean;
   lastActive?: Date;
-  subscriptionTier?: SubscriptionTier; // For admin management
+  subscriptionTier?: 'free' | 'pro' | 'enterprise'; // For admin management
   metadata?: {
     lastSignInTime?: string;
     creationTime?: string;
   };
-  subscription: SubscriptionInfo;
-  features: PlanLimits;
+  subscription: {
+    tier: 'free' | 'pro' | 'enterprise';
+    status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired';
+    currentPeriodEnd: Date;
+    cancelAtPeriodEnd: boolean;
+    startDate: Date;
+    trialEnd?: Date;
+    planId: string;
+    stripeSubscriptionId?: string;
+    features?: {
+      maxCards: number;
+      maxTransactions: number;
+      analytics: boolean;
+      export: boolean;
+      prioritySupport: boolean;
+      apiAccess: boolean;
+      teamManagement: boolean;
+      customIntegrations: boolean;
+    };
+  };
+  features: {
+    maxCards: number;
+    maxTransactions: number;
+    analytics: boolean;
+    export: boolean;
+    prioritySupport: boolean;
+    apiAccess: boolean;
+    teamManagement: boolean;
+    customIntegrations: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

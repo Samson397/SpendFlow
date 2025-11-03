@@ -36,7 +36,7 @@ function LoginContent() {
       await signInWithEmailAndPassword(auth, email, password);
 
       // Check if user is admin and redirect accordingly
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+      const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
 
       // Get current user after login
       const currentUser = auth.currentUser;
@@ -78,7 +78,7 @@ function LoginContent() {
       const user = result.user;
 
       // Check if user is admin and redirect accordingly
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+      const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
 
       const isAdmin = user.email ? adminEmails.includes(user.email) : false;
 

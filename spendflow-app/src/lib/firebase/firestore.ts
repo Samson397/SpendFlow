@@ -96,6 +96,12 @@ class FirestoreService<T extends { id: string }> {
 
   // Update a document
   async update(id: string, data: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+    // First check if document exists
+    const existingDoc = await this.get(id);
+    if (!existingDoc) {
+      throw new Error(`Document with ID ${id} does not exist in collection ${this.collectionName}`);
+    }
+
     const docRef = doc(db, this.collectionName, id);
     await updateDoc(docRef, {
       ...data,

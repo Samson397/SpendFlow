@@ -1,4 +1,8 @@
 import * as admin from 'firebase-admin';
+
+// Initialize Firebase Admin
+admin.initializeApp();
+
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { sendContactEmail } from './email';
 import {
@@ -9,9 +13,17 @@ import {
   deleteMessage
 } from './messages';
 import { upgradeSubscription } from './subscription';
+import {
+  createTeam,
+  getUserTeam,
+  getTeamMembers,
+  inviteTeamMember,
+  createSharedExpense,
+  getSharedExpenses
+} from './team';
 
-// Initialize Firebase Admin
-admin.initializeApp();
+// // Initialize Firebase Admin
+// admin.initializeApp();
 
 // Set the global options for all functions
 setGlobalOptions({
@@ -29,5 +41,11 @@ export {
   sendMessage,
   updateMessage,
   deleteMessage,
-  upgradeSubscription
+  upgradeSubscription,
+  createTeam,
+  getUserTeam,
+  getTeamMembers,
+  inviteTeamMember,
+  createSharedExpense,
+  getSharedExpenses
 };

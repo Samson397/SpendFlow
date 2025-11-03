@@ -23,7 +23,7 @@ export default function MaintenancePage() {
         try {
           // Check if user is admin (allow admins to bypass maintenance)
           if (user) {
-            const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+            const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
             const isAdmin = user.email ? adminEmails.includes(user.email) : false;
 
             if (isAdmin) {

@@ -3,8 +3,8 @@ import * as admin from 'firebase-admin';
 import * as nodemailer from 'nodemailer';
 import { defineString } from 'firebase-functions/params';
 
-// Initialize Firebase Admin
-admin.initializeApp();
+// // Initialize Firebase Admin
+// admin.initializeApp();
 
 // Define configuration parameters
 const gmailEmail = defineString('GMAIL_EMAIL');
@@ -123,7 +123,7 @@ export const sendContactEmail = onDocumentCreated(
     }
 
     const message = snapshot.data() as ContactMessage;
-    const adminEmail = 'spendflowapp@gmail.com';
+    const adminEmail = process.env.ADMIN_EMAIL || 'spendflowapp@gmail.com';
 
     // Email options
     const mailOptions = {
@@ -189,7 +189,8 @@ export const onReplyAdded = onDocumentUpdated(
       if ((newReply as any).notificationSent) return;
       
       // Get the message link (replace with your actual message URL)
-      const messageLink = `https://your-app-url.com/messages/${event.params.messageId}`;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://chat-76d96.web.app';
+      const messageLink = `${appUrl}/admin/messages/${event.params.messageId}`;
       
       try {
         await sendReplyNotification({

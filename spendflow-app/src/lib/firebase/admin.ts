@@ -24,5 +24,3 @@ export async function verifyIdToken(token: string) {
     email: 'demo@example.com'
   };
 }
-
-export default adminApp;

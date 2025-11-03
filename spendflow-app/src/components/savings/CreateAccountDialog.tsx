@@ -17,9 +17,9 @@ import { useAuth } from '@/lib/hooks/useAuth';
 const accountSchema = z.object({
   name: z.string().min(2, 'Account name must be at least 2 characters'),
   accountType: z.enum(['savings', 'checking']),
-  initialBalance: z.coerce.number().min(0, 'Initial balance cannot be negative'),
-  currency: z.string().default('USD'),
-  interestRate: z.coerce.number().min(0).max(100).optional(),
+  initialBalance: z.number().min(0, 'Initial balance cannot be negative'),
+  currency: z.string().min(1, 'Currency is required'),
+  interestRate: z.number().min(0).max(100).optional(),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
@@ -178,9 +178,14 @@ export function CreateAccountDialog({ open, onOpenChange, onSuccess }: CreateAcc
                     id="interestRate"
                     type="number"
                     step="0.01"
+                    min="0"
+                    max="100"
                     placeholder="e.g., 1.5"
                     className="pr-16"
-                    {...register('interestRate')}
+                    {...register('interestRate', { 
+                      valueAsNumber: true,
+                      setValueAs: (value) => value === '' ? undefined : parseFloat(value) || 0
+                    })}
                   />
                   <span className="absolute right-3 top-2.5 text-muted-foreground">%</span>
                 </div>

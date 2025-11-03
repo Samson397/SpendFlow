@@ -4,24 +4,29 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
-import { DEFAULT_SUBSCRIPTION_PLANS } from '@/database/schema';
+import { DEFAULT_SUBSCRIPTION_PLANS, SubscriptionPlanDocument } from '@/database/schema';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SetupPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [plans, setPlans] = useState<any[]>([]);
+  const [plans, setPlans] = useState<(SubscriptionPlanDocument & { id: string })[]>([]);
   const [isSeeding, setIsSeeding] = useState(false);
 
-  // Check if setup mode is enabled
+  // Check if setup mode is enabled or user is admin
   useEffect(() => {
-    const isSetupMode = process.env.NEXT_PUBLIC_SETUP_MODE === 'true';
-    if (!isSetupMode) {
+    const isSetupMode = process.env['NEXT_PUBLIC_SETUP_MODE'] === 'true';
+    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+    const isAdmin = user?.email && adminEmails.includes(user.email);
+
+    if (!isSetupMode && !isAdmin) {
       router.push('/');
       return;
     }
     checkExistingPlans();
-  }, [router]);
+  }, [router, user]);
 
   const checkExistingPlans = async () => {
     try {
@@ -32,7 +37,7 @@ export default function SetupPage() {
       const existingPlans = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as unknown as (SubscriptionPlanDocument & { id: string })[];
 
       setPlans(existingPlans);
     } catch (error) {
@@ -193,7 +198,7 @@ export default function SetupPage() {
 
           {/* Setup Action */}
           {plans.length === 0 && (
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg p-8 text-white">
+            <div className="bg-linear-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg p-8 text-white">
               <div className="text-center">
                 <h3 className="text-2xl font-bold mb-4">Ready to Set Up</h3>
                 <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
@@ -229,7 +234,7 @@ export default function SetupPage() {
 
           {/* Success State */}
           {plans.length > 0 && (
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg p-8 text-white">
+            <div className="bg-linear-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg p-8 text-white">
               <div className="text-center">
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

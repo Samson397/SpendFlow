@@ -2,9 +2,9 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions/v2/https';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-10-29.clover',
-});
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+//   apiVersion: '2025-10-29.clover',
+// });
 
 interface SubscriptionPlan {
   id: string;
@@ -276,12 +276,6 @@ const subscriptionService = SubscriptionService.getInstance();
 
 export const upgradeSubscription = functions.onCall(
   {
-    cors: [
-      {
-        origin: true, // Allow all origins in development
-        methods: ['POST'],
-      },
-    ],
     region: 'us-central1',
   },
   async (request) => {
@@ -320,6 +314,9 @@ export const upgradeSubscription = functions.onCall(
     }
 
     // For paid tiers, create Stripe checkout session
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      apiVersion: '2025-10-29.clover',
+    });
     const plans = await subscriptionService.getPlans();
     const targetPlan = plans.find(p => p.tier === tier);
 

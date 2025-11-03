@@ -19,12 +19,6 @@ interface Message {
 // Get all messages (for admin)
 export const getMessages = onCall(
   {
-    cors: [
-      {
-        origin: true,
-        methods: ['POST'],
-      },
-    ],
     region: 'us-central1',
   },
   async (request) => {
@@ -60,12 +54,6 @@ export const getMessages = onCall(
 // Get a single message
 export const getMessage = onCall(
   {
-    cors: [
-      {
-        origin: true,
-        methods: ['POST'],
-      },
-    ],
     region: 'us-central1',
   },
   async (request) => {
@@ -116,12 +104,6 @@ export const getMessage = onCall(
 // Send a new message
 export const sendMessage = onCall(
   {
-    cors: [
-      {
-        origin: true,
-        methods: ['POST'],
-      },
-    ],
     region: 'us-central1',
   },
   async (request) => {
@@ -129,18 +111,53 @@ export const sendMessage = onCall(
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
 
+  console.log('sendMessage called by user:', request.auth.uid);
+  console.log('Request data:', JSON.stringify(request.data, null, 2));
+
   const { to, subject, body, hasAttachment = false, labels = [] } = request.data;
 
-  if (!to || !subject || !body) {
-    throw new HttpsError('invalid-argument', 'Missing required fields');
+  // Validate required fields with more detail
+  if (!to) {
+    console.error('Missing "to" field in request data');
+    throw new HttpsError('invalid-argument', 'Recipient (to) field is required');
+  }
+  if (!subject) {
+    console.error('Missing "subject" field in request data');
+    throw new HttpsError('invalid-argument', 'Subject field is required');
+  }
+  if (!body) {
+    console.error('Missing "body" field in request data');
+    throw new HttpsError('invalid-argument', 'Body field is required');
+  }
+
+  // Additional validation
+  if (typeof to !== 'string' || to.trim().length === 0) {
+    console.error('Invalid "to" field:', to);
+    throw new HttpsError('invalid-argument', 'Recipient must be a non-empty string');
+  }
+  if (typeof subject !== 'string' || subject.trim().length === 0) {
+    console.error('Invalid "subject" field:', subject);
+    throw new HttpsError('invalid-argument', 'Subject must be a non-empty string');
+  }
+  if (typeof body !== 'string' || body.trim().length === 0) {
+    console.error('Invalid "body" field:', body);
+    throw new HttpsError('invalid-argument', 'Body must be a non-empty string');
+  }
+  if (typeof hasAttachment !== 'boolean') {
+    console.error('Invalid "hasAttachment" field:', hasAttachment);
+    throw new HttpsError('invalid-argument', 'hasAttachment must be a boolean');
+  }
+  if (!Array.isArray(labels)) {
+    console.error('Invalid "labels" field:', labels);
+    throw new HttpsError('invalid-argument', 'Labels must be an array');
   }
 
   try {
     const messageData: Omit<Message, 'id'> = {
       from: request.auth.uid,
-      to,
-      subject,
-      body,
+      to: to.trim(),
+      subject: subject.trim(),
+      body: body.trim(),
       read: false,
       hasAttachment,
       labels,
@@ -148,27 +165,42 @@ export const sendMessage = onCall(
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
+    console.log('Attempting to add message to Firestore:', JSON.stringify(messageData, null, 2));
+
     const docRef = await db.collection('messages').add(messageData);
-    
-    return { 
-      success: true, 
-      messageId: docRef.id 
+
+    console.log('Message sent successfully with ID:', docRef.id);
+
+    return {
+      success: true,
+      messageId: docRef.id
     };
   } catch (error) {
     console.error('Error sending message:', error);
-    throw new HttpsError('internal', 'Error sending message');
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      code: (error as any)?.code || 'unknown',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
+    // Provide more specific error messages based on error type
+    if (error instanceof HttpsError) {
+      throw error; // Re-throw HttpsError as-is
+    } else if ((error as any)?.code === 'permission-denied') {
+      throw new HttpsError('permission-denied', 'You do not have permission to send messages');
+    } else if ((error as any)?.code === 'invalid-argument') {
+      throw new HttpsError('invalid-argument', 'Invalid message data provided');
+    } else if ((error as any)?.code === 'resource-exhausted') {
+      throw new HttpsError('resource-exhausted', 'Message sending limit exceeded');
+    } else {
+      throw new HttpsError('internal', `Error sending message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 });
 
 // Update message (mark as read, add/remove labels, etc.)
 export const updateMessage = onCall(
   {
-    cors: [
-      {
-        origin: true,
-        methods: ['POST'],
-      },
-    ],
     region: 'us-central1',
   },
   async (request) => {
@@ -224,12 +256,6 @@ export const updateMessage = onCall(
 // Delete a message
 export const deleteMessage = onCall(
   {
-    cors: [
-      {
-        origin: true,
-        methods: ['POST'],
-      },
-    ],
     region: 'us-central1',
   },
   async (request) => {

@@ -45,7 +45,9 @@ export function AdvancedAnalytics() {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const transactions = await transactionsService.getRecentByUserId(user!.uid, 10000);
+      console.log('AdvancedAnalytics: Loading analytics for user:', user!.uid, 'timeRange:', timeRange);
+      const transactions = await transactionsService.getRecentByUserId(user!.uid, 1000);
+      console.log('AdvancedAnalytics: Fetched', transactions.length, 'transactions');
 
       // Filter by time range
       const now = new Date();
@@ -53,11 +55,34 @@ export function AdvancedAnalytics() {
       const cutoffDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
 
       const filteredTransactions = transactions.filter(t => t.date >= cutoffDate);
+      console.log('AdvancedAnalytics: Filtered to', filteredTransactions.length, 'transactions for time range');
 
       const analyticsData = processAnalytics(filteredTransactions);
       setAnalytics(analyticsData);
+      console.log('AdvancedAnalytics: Analytics processed successfully');
     } catch (error) {
-      console.error('Error loading analytics:', error);
+      console.error('AdvancedAnalytics: Error loading analytics:', error);
+
+      // Provide more specific error information
+      if (error instanceof Error) {
+        console.error('AdvancedAnalytics: Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+
+        // Check for specific Firebase errors
+        if (error.message.includes('quota')) {
+          console.error('AdvancedAnalytics: Firebase quota exceeded');
+        } else if (error.message.includes('permission')) {
+          console.error('AdvancedAnalytics: Permission denied');
+        } else if (error.message.includes('unavailable')) {
+          console.error('AdvancedAnalytics: Service unavailable');
+        }
+      }
+
+      // Set analytics to null on error to show error state
+      setAnalytics(null);
     } finally {
       setLoading(false);
     }
@@ -207,12 +232,19 @@ export function AdvancedAnalytics() {
     );
   }
 
-  if (!analytics) {
+  if (!analytics && !loading) {
     return (
       <div className="bg-slate-900/50 border border-slate-800 backdrop-blur-sm p-6 rounded-lg">
-        <div className="text-center py-12">
-          <BarChart3 className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-500">No data available for analysis</p>
+        <div className="text-center">
+          <BarChart3 className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-400 mb-2">Analytics Unavailable</h3>
+          <p className="text-slate-500 text-sm mb-4">Unable to load analytics data. This may be due to a temporary service issue.</p>
+          <button
+            onClick={loadAnalytics}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md transition-colors text-sm"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -259,7 +291,7 @@ export function AdvancedAnalytics() {
             <span className="text-sm text-slate-400">Largest Transaction</span>
           </div>
           <div className="text-xl font-bold text-slate-100">
-            {analytics.largestTransaction ? formatAmount(analytics.largestTransaction.amount) : 'N/A'}
+            {analytics.largestTransaction ? formatAmount(analytics.largestTransaction.amount) : formatAmount(0)}
           </div>
         </div>
 

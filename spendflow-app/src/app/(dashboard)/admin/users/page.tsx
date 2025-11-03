@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
 
       try {
         // Use same admin check logic as AuthContext - supports multiple admins
-        const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+        const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
         const userIsAdmin = user.email ? adminEmails.includes(user.email) : false;
 
         setIsAdmin(userIsAdmin);

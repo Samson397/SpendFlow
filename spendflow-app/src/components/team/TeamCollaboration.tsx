@@ -6,27 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import toast from 'react-hot-toast';
-
-interface TeamMember {
-  id: string;
-  email: string;
-  displayName: string;
-  role: 'owner' | 'admin' | 'member';
-  joinedAt: Date;
-  isActive: boolean;
-}
-
-interface SharedExpense {
-  id: string;
-  title: string;
-  amount: number;
-  category: string;
-  paidBy: string; // user ID
-  paidByName: string;
-  splitBetween: string[]; // user IDs
-  date: Date;
-  description?: string;
-}
+import { teamService } from '@/lib/services/teamService';
+import { Team, TeamMember, SharedExpense } from '@/types/team';
 
 export function TeamCollaboration() {
   const { user } = useAuth();
@@ -42,59 +23,67 @@ export function TeamCollaboration() {
 
   useEffect(() => {
     if (user && canAccessTeams) {
-      // Simulate loading team data
-      setTimeout(() => {
-        setTeamMembers([
-          {
-            id: user.uid,
-            email: user.email || '',
-            displayName: user.displayName || 'You',
-            role: 'owner',
-            joinedAt: new Date(),
-            isActive: true
-          }
-        ]);
-
-        setSharedExpenses([
-          {
-            id: '1',
-            title: 'Team Lunch',
-            amount: 45.50,
-            category: 'Food',
-            paidBy: user.uid,
-            paidByName: user.displayName || 'You',
-            splitBetween: [user.uid],
-            date: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            description: 'Weekly team lunch at the office'
-          }
-        ]);
-
-        setLoading(false);
-      }, 1000);
+      loadTeamData();
     } else if (!canAccessTeams) {
       setLoading(false);
     }
   }, [user, canAccessTeams]);
 
-  const handleInviteMember = (email: string) => {
-    // Mock invitation
-    toast.success(`Invitation sent to ${email}`);
-    setShowInviteModal(false);
+  const loadTeamData = async () => {
+    try {
+      setLoading(true);
+
+      // Load team members and expenses in parallel
+      const [membersResult, expensesResult] = await Promise.allSettled([
+        teamService.getTeamMembers(),
+        teamService.getSharedExpenses(),
+      ]);
+
+      if (membersResult.status === 'fulfilled') {
+        setTeamMembers(membersResult.value.members);
+      } else {
+        console.error('Failed to load team members:', membersResult.reason);
+        toast.error('Failed to load team members');
+      }
+
+      if (expensesResult.status === 'fulfilled') {
+        setSharedExpenses(expensesResult.value);
+      } else {
+        console.error('Failed to load shared expenses:', expensesResult.reason);
+        toast.error('Failed to load shared expenses');
+      }
+    } catch (error) {
+      console.error('Error loading team data:', error);
+      toast.error('Failed to load team data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateSharedExpense = (expense: Omit<SharedExpense, 'id' | 'paidBy' | 'paidByName'>) => {
-    if (!user) return;
+  const handleInviteMember = async (email: string) => {
+    try {
+      const result = await teamService.inviteTeamMember(email);
+      toast.success(result.message);
+      setShowInviteModal(false);
+    } catch (error) {
+      console.error('Error inviting member:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send invitation');
+    }
+  };
 
-    const newExpense: SharedExpense = {
-      ...expense,
-      id: Date.now().toString(),
-      paidBy: user.uid,
-      paidByName: user.displayName || 'You'
-    };
+  const handleCreateSharedExpense = async (expense: Omit<SharedExpense, 'id' | 'paidBy' | 'paidByName' | 'createdAt' | 'updatedAt' | 'isActive' | 'createdBy' | 'teamId'>) => {
+    try {
+      const result = await teamService.createSharedExpense(expense);
+      toast.success(result.message);
+      setShowNewExpense(false);
 
-    setSharedExpenses(prev => [newExpense, ...prev]);
-    setShowNewExpense(false);
-    toast.success('Shared expense created!');
+      // Refresh expenses
+      const expensesResult = await teamService.getSharedExpenses();
+      setSharedExpenses(expensesResult);
+    } catch (error) {
+      console.error('Error creating shared expense:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create shared expense');
+    }
   };
 
   if (!canAccessTeams) {
@@ -255,7 +244,7 @@ function InviteMemberModal({ onClose, onInvite }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-40">
       <div className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-serif text-slate-100">Invite Team Member</h3>
@@ -349,7 +338,7 @@ function NewSharedExpenseModal({ onClose, onCreate, teamMembers }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-40">
       <div className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-2xl w-full p-6">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-serif text-slate-100">Create Shared Expense</h3>
@@ -450,8 +439,8 @@ function NewSharedExpenseModal({ onClose, onCreate, teamMembers }: {
                 <label key={member.id} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-md hover:bg-slate-700/50 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={formData.splitBetween.includes(member.id)}
-                    onChange={() => toggleMember(member.id)}
+                    checked={formData.splitBetween.includes(member.userId)}
+                    onChange={() => toggleMember(member.userId)}
                     className="text-amber-400 focus:ring-amber-500"
                   />
                   <div>

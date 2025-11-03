@@ -203,7 +203,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         }
 
         // Check if user is admin (admins can bypass maintenance mode)
-        const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+        const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
         const isAdminUser = user?.email ? adminEmails.includes(user.email) : false;
 
         if (!isAdminUser) {

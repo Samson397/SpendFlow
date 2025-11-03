@@ -7,14 +7,7 @@
 
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
-  createPaymentMethod,
-  createSubscription as createStripeSubscription,
-  updateSubscription as updateStripeSubscription,
-  cancelSubscription as cancelStripeSubscription,
-  listPaymentMethods,
   PaymentMethod,
-  Subscription as StripeSubscription,
-  Customer,
 } from '@stripe/stripe-js';
 import { subscriptionService } from '@/lib/services/subscriptionService';
 import { CreateSubscriptionRequest, UpdateSubscriptionRequest } from '@/types';
@@ -90,7 +83,7 @@ class StripePaymentService {
       const customer = await this.createCustomer(userId);
 
       // Create subscription in Stripe
-      const subscriptionData = {
+      const subscriptionData: any = {
         customer: customer.id,
         items: [{ price: plan.stripePriceId }],
         payment_behavior: 'default_incomplete',
@@ -238,7 +231,7 @@ class StripePaymentService {
   /**
    * Create or retrieve Stripe customer
    */
-  private async createCustomer(userId: string): Promise<Customer> {
+  private async createCustomer(userId: string): Promise<any> {
     // This would typically be done via your backend API
     // For now, we'll assume the customer is created when needed
     const response = await fetch('/api/stripe/create-customer', {
@@ -315,18 +308,18 @@ class StripePaymentService {
 
   // ========== WEBHOOK HANDLERS ==========
 
-  private async handleSubscriptionCreated(stripeSubscription: StripeSubscription): Promise<void> {
+  private async handleSubscriptionCreated(stripeSubscription: any): Promise<void> {
     // Update subscription status in our database
     console.log('Subscription created:', stripeSubscription.id);
     // Implementation depends on how you map Stripe subscriptions to your users
   }
 
-  private async handleSubscriptionUpdated(stripeSubscription: StripeSubscription): Promise<void> {
+  private async handleSubscriptionUpdated(stripeSubscription: any): Promise<void> {
     // Update subscription details in our database
     console.log('Subscription updated:', stripeSubscription.id);
   }
 
-  private async handleSubscriptionDeleted(stripeSubscription: StripeSubscription): Promise<void> {
+  private async handleSubscriptionDeleted(stripeSubscription: any): Promise<void> {
     // Mark subscription as canceled in our database
     console.log('Subscription deleted:', stripeSubscription.id);
   }

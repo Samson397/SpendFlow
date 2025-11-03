@@ -14,10 +14,10 @@ export default function SetupAdmin() {
 
   // Check if user is authorized for admin setup
   const adminEmails = [
-    ...(process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [])
+    ...(process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [])
   ].filter(Boolean); // Filter out undefined values
 
-  const isAuthorized = user && adminEmails.includes(user.email);
+  const isAuthorized = user && user.email && adminEmails.includes(user.email);
 
   const makeAdmin = async () => {
     if (!user) {

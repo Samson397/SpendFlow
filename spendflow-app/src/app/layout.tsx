@@ -1,12 +1,21 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
-import './globals.css';
+import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { ThemeProvider } from '@/contexts/ThemeProvider';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import { Toaster } from '@/components/ui/use-toast';
-import CookieBannerWrapper from '@/components/layout/CookieBannerWrapper';
+import './globals.css';
+
+// Import DeepSeek service for AI features
+import { initializeDeepSeek } from '@/lib/services/deepSeekService';
+import { DeepSeekInitializer } from '@/components/DeepSeekInitializer';
+import { validateEnvironment } from '@/lib/env-validation';
+
+// Validate environment variables on server startup
+validateEnvironment();
 
 const inter = Inter({
   subsets: ['latin'],
@@ -15,9 +24,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'SpendFlow - Premium Financial Management',
-  description: 'Track expenses, manage cards, and gain financial insights with SpendFlow.',
+  title: 'SpendFlow - Smart Financial Management',
+  description: 'Take control of your finances with SpendFlow. Track expenses, manage cards, and gain insights into your spending habits.',
   applicationName: 'SpendFlow',
+  authors: [{ name: 'SpendFlow Team' }],
+  creator: 'SpendFlow',
+  publisher: 'SpendFlow',
+  manifest: '/manifest.json?v=20241103',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -26,11 +39,28 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'SpendFlow',
+    'mobile-web-app-capable': 'yes',
+    'msapplication-TileColor': '#0f172a',
+    'msapplication-config': '/browserconfig.xml',
+    'theme-color': '#f59e0b',
+  },
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/icon-128.png', sizes: '128x128', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-256.png', sizes: '256x256', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
       { url: '/logo.png', sizes: 'any', type: 'image/png' },
+    ],
+    shortcut: [
+      { url: '/favicon.ico', sizes: 'any' },
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
@@ -60,9 +90,12 @@ export default function RootLayout({
           <SubscriptionProvider>
             <CurrencyProvider>
               <ThemeProvider>
-                <CookieBannerWrapper />
-                {children}
-                <Toaster />
+                <ErrorBoundary>
+                  <ServiceWorkerRegistration />
+                  <DeepSeekInitializer />
+                  {children}
+                  <Toaster />
+                </ErrorBoundary>
               </ThemeProvider>
             </CurrencyProvider>
           </SubscriptionProvider>

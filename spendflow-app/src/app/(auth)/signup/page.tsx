@@ -11,11 +11,6 @@ import { AuthGate } from '@/components/auth/AuthGate';
 import { alertsService } from '@/lib/alerts';
 import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
 
-type SignupError = {
-  code: string;
-  message: string;
-};
-
 function SignupContent() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -38,7 +33,7 @@ function SignupContent() {
         
         if (settingsDoc.exists()) {
           const settings = settingsDoc.data();
-          const enabled = settings.registrationEnabled !== false; // Default to true if not set
+          const enabled = settings['registrationEnabled'] !== false; // Default to true if not set
           setRegistrationEnabled(enabled);
           console.log('Registration enabled:', enabled);
         } else {
@@ -69,6 +64,7 @@ function SignupContent() {
       const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
       return () => clearTimeout(timer);
     }
+    return () => {}; // Return empty cleanup function for other cases
   }, [resendCooldown]);
 
   const handleResendVerification = async () => {
@@ -142,9 +138,7 @@ function SignupContent() {
       }
 
       // Check if user is admin and redirect accordingly
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
-
-      const isAdmin = user.email ? adminEmails.includes(user.email) : false;
+      // (Admin check removed for email signup - handled in verification flow)
 
       // Show verification message instead of redirecting
       setVerificationSent(true);
@@ -184,7 +178,7 @@ function SignupContent() {
       }
 
       // Check if user is admin and redirect accordingly
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+      const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
 
       const isAdmin = user.email ? adminEmails.includes(user.email) : false;
 

@@ -45,7 +45,7 @@ export default function SecurityPanel() {
   
   // Calculate derived state
   const failedLoginAttempts = securityEvents.filter(e => e.type === 'failed_attempt').length;
-  const securityAlerts = securityEvents.filter(e => e.status === 'warning' || e.status === 'error').length;
+  const securityAlerts = securityEvents.filter(e => !e.success).length;
   
   // Calculate security score (0-100)
   const securityScore = Math.max(0, Math.min(100, 
@@ -171,9 +171,10 @@ export default function SecurityPanel() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (date: Date | { toDate: () => Date }) => {
     try {
-      return new Date(dateString).toLocaleString();
+      const dateObj = date instanceof Date ? date : date.toDate();
+      return dateObj.toLocaleString();
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid date';
@@ -241,7 +242,7 @@ export default function SecurityPanel() {
               <p className="text-sm text-slate-400">Active Sessions</p>
               <div className="flex items-center mt-1">
                 <div className="text-3xl font-bold text-amber-400">
-                  {securityEvents.filter(e => e.status === 'warning' || e.status === 'error').length}
+                  {securityEvents.filter(e => !e.success).length}
                 </div>
                 <div className="ml-2 text-sm text-slate-400">
                   <div>Active Alerts</div>

@@ -50,10 +50,10 @@ const getDefaultLimits = (tier: string): PlanLimits => {
 
 export interface AccessCheckResult {
   allowed: boolean;
-  reason?: string;
-  upgradeRequired?: boolean;
-  currentUsage?: number;
-  limit?: number;
+  reason?: string | undefined;
+  upgradeRequired?: boolean | undefined;
+  currentUsage?: number | undefined;
+  limit?: number | undefined;
 }
 
 export interface FeatureAccessOptions {
@@ -87,6 +87,16 @@ class AccessControlService {
     options: { currentCount?: number } = {}
   ): Promise<AccessCheckResult> {
     try {
+      // Check if user is admin - admins get unlimited access to everything
+      if (await this.isUserAdmin(userId)) {
+        return {
+          allowed: true,
+          reason: 'Admin access - no limits applied',
+          currentUsage: options.currentCount,
+          limit: -1, // unlimited
+        };
+      }
+
       // Get user's subscription limits
       const userLimits = await subscriptionService.getUserLimits(userId);
 
@@ -207,7 +217,32 @@ class AccessControlService {
     };
   }
 
-  // ========== PRIVATE HELPERS ==========
+  /**
+   * Check if a user is an admin (bypasses all limits)
+   */
+  private async isUserAdmin(userId: string): Promise<boolean> {
+    try {
+      // Get admin emails from environment
+      const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+
+      // Import usersService to check user profile
+      const { usersService } = await import('../firebase/firestore');
+
+      // Get user profile to check if they're marked as admin
+      const userProfile = await usersService.get(userId);
+
+      if (userProfile?.email && adminEmails.includes(userProfile.email)) {
+        return true;
+      }
+
+      // Also check the isAdmin flag in the user profile
+      return userProfile?.isAdmin === true;
+
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  }
 
   /**
    * Get current card count for a user
@@ -257,16 +292,49 @@ export function useAccessControl() {
       return { allowed: false, reason: 'User not authenticated' };
     }
 
+    // Check if user is admin - admins get unlimited access
+    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+    if (user.email && adminEmails.includes(user.email)) {
+      return {
+        allowed: true,
+        reason: 'Admin access - no limits applied',
+        currentUsage: options.currentCount,
+        limit: -1,
+      };
+    }
+
     return accessControlService.checkFeatureAccess(user.uid, feature, options);
   };
 
   const canAddCard = async (): Promise<AccessCheckResult> => {
     if (!user) return { allowed: false, reason: 'User not authenticated' };
+
+    // Check if user is admin - admins get unlimited access
+    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+    if (user.email && adminEmails.includes(user.email)) {
+      return {
+        allowed: true,
+        reason: 'Admin access - no limits applied',
+        limit: -1,
+      };
+    }
+
     return accessControlService.canAddCard(user.uid);
   };
 
   const canAddTransaction = async (): Promise<AccessCheckResult> => {
     if (!user) return { allowed: false, reason: 'User not authenticated' };
+
+    // Check if user is admin - admins get unlimited access
+    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+    if (user.email && adminEmails.includes(user.email)) {
+      return {
+        allowed: true,
+        reason: 'Admin access - no limits applied',
+        limit: -1,
+      };
+    }
+
     return accessControlService.canAddTransaction(user.uid);
   };
 
@@ -337,7 +405,7 @@ export function withSubscriptionCheck<P extends object>(
       };
 
       checkAccess();
-    }, [user, requiredFeature, tier, subscription]);
+    }, [user, tier, subscription]);
 
     if (loading) {
       return <div>Loading...</div>; // Or your loading component

@@ -19,7 +19,8 @@ export interface FriendlyError {
  * Converts Firebase auth error codes to user-friendly messages
  */
 export function getFirebaseAuthError(error: FirebaseError | unknown): FriendlyError {
-  const errorCode = error?.code || error?.message || 'unknown';
+  const errorObj = error as any;
+  const errorCode = errorObj?.code || errorObj?.message || 'unknown';
 
   // Firebase Auth error mappings
   const errorMap: Record<string, FriendlyError> = {

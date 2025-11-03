@@ -34,6 +34,16 @@ function CalendarPageContent() {
   useEffect(() => {
     if (!user) return;
     loadData();
+    
+    // Refresh data every 30 seconds and when window gains focus
+    const intervalId = setInterval(loadData, 30000);
+    const handleFocus = () => loadData();
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -110,13 +120,13 @@ function CalendarPageContent() {
 
   // Touch gesture handlers for swipe navigation
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!isTouchDevice) return;
+    if (!isTouchDevice || !e.touches[0]) return;
     setTouchStartX(e.touches[0].clientX);
     setTouchStartY(e.touches[0].clientY);
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isTouchDevice || touchStartX === null || touchStartY === null) return;
+    if (!isTouchDevice || touchStartX === null || touchStartY === null || !e.changedTouches[0]) return;
 
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;

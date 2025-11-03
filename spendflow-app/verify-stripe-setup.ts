@@ -34,7 +34,7 @@ try {
   const schemaContent = fs.readFileSync(schemaPath, 'utf8');
 
   const proPriceIdMatch = schemaContent.match(/stripePriceId:\s*['"`]([^'"`]+)['"`]/g);
-  const proPriceIds = proPriceIdMatch ? proPriceIdMatch.filter(id =>
+  const proPriceIds = proPriceIdMatch ? proPriceIdMatch.filter((id: string) =>
     !id.includes('price_pro_monthly') && !id.includes('price_enterprise_monthly')
   ) : [];
 

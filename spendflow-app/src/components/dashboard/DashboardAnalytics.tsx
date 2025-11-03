@@ -169,7 +169,7 @@ function DashboardAnalytics() {
       </div>
 
       {/* Top Categories */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+      <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 sm:p-6">
         <h3 className="text-lg font-serif text-slate-100 mb-4">Top Spending Categories</h3>
         <div className="space-y-3">
           {analytics.topCategories.length > 0 ? (
@@ -196,15 +196,15 @@ function DashboardAnalytics() {
       </div>
 
       {/* Monthly Trend */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+      <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 sm:p-6">
         <h3 className="text-lg font-serif text-slate-100 mb-4">Monthly Trend</h3>
-        <div className="grid grid-cols-6 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-4">
           {analytics.monthlyTrend.map((month) => (
             <div key={month.month} className="text-center">
-              <div className="text-xs text-slate-500 mb-1">{month.month}</div>
+              <div className="text-xs sm:text-xs text-slate-500 mb-1">{month.month}</div>
               <div className="space-y-1">
-                <div className="text-xs text-green-400">+{formatAmount(month.earned)}</div>
-                <div className="text-xs text-red-400">-{formatAmount(month.spent)}</div>
+                <div className="text-[10px] sm:text-xs text-green-400 font-medium">+{formatAmount(month.earned)}</div>
+                <div className="text-[10px] sm:text-xs text-red-400 font-medium">-{formatAmount(month.spent)}</div>
               </div>
             </div>
           ))}

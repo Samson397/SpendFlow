@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { Plus, TrendingUp, TrendingDown, CreditCard } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, CreditCard, Award } from 'lucide-react';
 import { transactionsService, cardsService } from '@/lib/firebase/firestore';
 import { Transaction } from '@/types';
 import { format } from 'date-fns';
@@ -26,6 +26,7 @@ function TransactionsPageContent() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [hasCards, setHasCards] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
+  const [largestTransaction, setLargestTransaction] = useState<number | null>(null);
 
   const handleTransactionClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -86,6 +87,7 @@ function TransactionsPageContent() {
         window.removeEventListener('focus', handleFocus);
       };
     }
+    return () => {}; // Return empty cleanup function when no user
   }, [user]);
 
   const loadData = async () => {
@@ -93,6 +95,14 @@ function TransactionsPageContent() {
       setLoading(true);
       const transactionsData = await transactionsService.getRecentByUserId(user!.uid, 100);
       setTransactions(transactionsData);
+
+      // Calculate largest transaction
+      if (transactionsData.length > 0) {
+        const maxAmount = Math.max(...transactionsData.map(t => t.amount));
+        setLargestTransaction(maxAmount);
+      } else {
+        setLargestTransaction(null);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -191,7 +201,7 @@ function TransactionsPageContent() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
         <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 md:p-8 backdrop-blur-sm">
           <div className="border-l-2 border-amber-600 pl-4 sm:pl-6">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -209,6 +219,16 @@ function TransactionsPageContent() {
               <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Total Expenses</div>
             </div>
             <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{formatAmount(totalExpenses)}</div>
+          </div>
+        </div>
+
+        <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 md:p-8 backdrop-blur-sm">
+          <div className="border-l-2 border-amber-600 pl-4 sm:pl-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <Award className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+              <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Largest Transaction</div>
+            </div>
+            <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{largestTransaction ? formatAmount(largestTransaction) : 'N/A'}</div>
           </div>
         </div>
       </div>
@@ -229,7 +249,10 @@ function TransactionsPageContent() {
           </select>
         </div>
 
-        <button>
+        <button
+          onClick={handleAddTransactionClick}
+          className="flex items-center gap-2 px-4 py-2 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
+        >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Add Transaction</span>
           <span className="sm:hidden">Add</span>

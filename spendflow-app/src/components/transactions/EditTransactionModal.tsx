@@ -45,7 +45,7 @@ export function EditTransactionModal({ isOpen, transaction, onClose, onSuccess }
         amount: transaction.amount.toString(),
         category: transaction.category,
         description: transaction.description || '',
-        cardId: transaction.cardId,
+        cardId: transaction.cardId || '',
         date: transactionDate.toISOString().split('T')[0],
       });
     }
