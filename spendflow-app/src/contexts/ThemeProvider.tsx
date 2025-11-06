@@ -1,34 +1,14 @@
 'use client';
 
-import { useEffect, ReactNode } from 'react';
-import { useSubscription } from './SubscriptionContext';
+import { ReactNode } from 'react';
 
 interface ThemeProviderProps {
   children: ReactNode;
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const { theme } = useSubscription();
-
-  useEffect(() => {
-    // Apply theme CSS variables to document root
-    const root = document.documentElement;
-
-    root.style.setProperty('--theme-primary', theme.primary);
-    root.style.setProperty('--theme-secondary', theme.secondary);
-    root.style.setProperty('--theme-accent', theme.accent);
-    root.style.setProperty('--theme-background', theme.background);
-    root.style.setProperty('--theme-surface', theme.surface);
-    root.style.setProperty('--theme-text', theme.text);
-    root.style.setProperty('--theme-text-secondary', theme.textSecondary);
-    root.style.setProperty('--theme-border', theme.border);
-    root.style.setProperty('--theme-gradient', theme.gradient);
-
-    // Apply theme class to body
-    document.body.className = `theme-${theme.name.toLowerCase()}`;
-
-  }, [theme]);
-
+  // Simple theme provider without subscription dependency
+  // Theme is now managed via Tailwind CSS classes
   return <>{children}</>;
 }
 
