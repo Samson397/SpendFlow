@@ -29,7 +29,6 @@ const userNavigation: NavItem[] = [
   { name: 'Savings', href: '/savings', icon: BuildingLibraryIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
   { name: 'AI Assistant', href: '/ai', icon: BoltIcon },
-  { name: 'Subscription', href: '/subscription', icon: SparklesIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
 ];
 
@@ -41,9 +40,6 @@ const adminNavigation: NavItem[] = [
   { name: 'Admin Setup', href: '/setup-admin', icon: ShieldCheckIcon },
   { name: 'Settings', href: '/admin/settings', icon: SparklesIcon },
 ];
-
-// Dynamically import AdManager with no SSR
-const AdManager = dynamic(() => import('@/components/ads/AdManager'), { ssr: false });
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -237,11 +233,6 @@ export default function Sidebar() {
                 <div className="mb-4">
                   <CurrencySelector />
                 </div>
-              </div>
-              {/* Ad - Desktop only */}
-              <div className="hidden md:block p-2 rounded-lg bg-slate-800/50">
-                <p className="text-xs text-slate-400 mb-1 text-center">Advertisement</p>
-                <AdManager adUnit="SIDEBAR" className="rounded overflow-hidden" />
               </div>
               {/* Sign Out Button */}
               <button
