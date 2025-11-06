@@ -15,7 +15,6 @@ A professional, enterprise-grade expense tracking and financial management appli
 ### Professional Features
 - **Authentication & Authorization**: Secure Firebase Authentication with role-based access
 - **Admin Dashboard**: Comprehensive admin panel for user and system management
-- **Subscription Management**: Stripe-powered subscription system with tiered pricing
 - **Real-time Presence**: Live user presence and activity monitoring
 - **Audit Logging**: Complete activity logging for security and compliance
 - **Rate Limiting**: API rate limiting to prevent abuse
@@ -42,7 +41,6 @@ A professional, enterprise-grade expense tracking and financial management appli
 
 ### Backend & Infrastructure
 - **Firebase**: Authentication, Firestore database, Cloud Functions
-- **Stripe**: Payment processing and subscription management
 - **Vercel**: Deployment and hosting platform
 
 ### Development & Testing
@@ -88,7 +86,6 @@ spendflow-app/
 ### Prerequisites
 - Node.js 18+ and npm
 - Firebase project with Firestore and Authentication enabled
-- Stripe account for payment processing (optional)
 
 ### Installation
 
@@ -117,10 +114,6 @@ spendflow-app/
 
    # Admin Configuration
    NEXT_PUBLIC_ADMIN_EMAILS=admin@example.com,admin2@example.com
-
-   # Stripe (Optional)
-   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-   STRIPE_SECRET_KEY=sk_test_...
 
    # Setup Mode (for initial setup)
    NEXT_PUBLIC_SETUP_MODE=false
@@ -196,12 +189,6 @@ npm run test:coverage
 - Account activation/deactivation
 - User activity monitoring
 
-### Subscription Management
-- Create and manage subscription plans
-- Assign tiers to users
-- Monitor subscription analytics
-- Handle Stripe webhooks
-
 ### System Monitoring
 - Real-time activity logging
 - Error tracking and reporting
@@ -247,7 +234,6 @@ Ensure all production environment variables are set in your hosting platform:
 
 - Firebase configuration
 - Admin email addresses
-- Stripe keys (if using payments)
 - Logging and monitoring keys
 
 ## 📈 Performance
@@ -294,7 +280,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with Next.js and the amazing React ecosystem
 - Firebase for robust backend services
-- Stripe for seamless payment processing
 - The open-source community for incredible tools and libraries
 
 ---
