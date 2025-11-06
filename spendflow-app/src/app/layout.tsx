@@ -3,7 +3,6 @@ import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import { Toaster } from '@/components/ui/use-toast';
@@ -87,18 +86,16 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className={`${inter.variable} font-sans h-full bg-slate-900 text-slate-100 antialiased`}>
         <AuthProvider>
-          <SubscriptionProvider>
-            <CurrencyProvider>
-              <ThemeProvider>
-                <ErrorBoundary>
-                  <ServiceWorkerRegistration />
-                  <DeepSeekInitializer />
-                  {children}
-                  <Toaster />
-                </ErrorBoundary>
-              </ThemeProvider>
-            </CurrencyProvider>
-          </SubscriptionProvider>
+          <CurrencyProvider>
+            <ThemeProvider>
+              <ErrorBoundary>
+                <ServiceWorkerRegistration />
+                <DeepSeekInitializer />
+                {children}
+                <Toaster />
+              </ErrorBoundary>
+            </ThemeProvider>
+          </CurrencyProvider>
         </AuthProvider>
       </body>
     </html>
