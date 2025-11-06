@@ -1,7 +1,19 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
+import { Toaster } from '@/components/ui/use-toast';
 import './globals.css';
+
+// Import DeepSeek service for AI features
+import { DeepSeekInitializer } from '@/components/DeepSeekInitializer';
+import { validateEnvironment } from '@/lib/env-validation';
+
+// Validate environment variables on server startup
+validateEnvironment();
 
 const inter = Inter({
   subsets: ['latin'],
