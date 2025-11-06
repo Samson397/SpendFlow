@@ -1,18 +1,31 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  distDir: 'dist',
+  // Removed 'output: export' - incompatible with server features
+  // distDir: 'dist', // Use default .next for development
   images: {
     unoptimized: true,
   },
-  trailingSlash: true, // Required for Firebase Hosting
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Enable type checking
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Enable linting
   },
-  // Add any other Next.js config options here
+  // Webpack configuration for better module resolution
+  webpack: (config, { isServer }) => {
+    // Don't override devtool in development (causes performance issues)
+    // Next.js handles this automatically
+    
+    // Ensure proper module resolution
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    };
+    
+    return config;
+  },
 };
 
 module.exports = nextConfig;
