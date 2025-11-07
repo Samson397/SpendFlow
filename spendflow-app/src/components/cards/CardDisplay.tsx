@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Card as CardType } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { getCardExpiryStatus } from '@/lib/utils/cardExpiry';
@@ -10,11 +11,15 @@ interface CardDisplayProps {
 }
 
 export function CardDisplay({ card }: CardDisplayProps) {
-  const cardNumberDisplay = `•••• •••• •••• ${card.cardNumber.slice(-4)}`;
-  const expiryParts = card.expiryDate.split('/');
+  // Get last 4 digits from cardNumber or lastFour field
+  const lastFour = card.lastFour || (card.cardNumber ? card.cardNumber.slice(-4) : '****');
+  const cardNumberDisplay = `•••• •••• •••• ${lastFour}`;
 
-  // Check expiry status
-  const { isExpired, isExpiringSoon } = getCardExpiryStatus(card.expiryDate);
+  // Handle expiry date
+  const expiryParts = card.expiryDate ? card.expiryDate.split('/') : ['--', '--'];
+
+  // Check expiry status if expiryDate exists
+  const { isExpired, isExpiringSoon } = card.expiryDate ? getCardExpiryStatus(card.expiryDate) : { isExpired: false, isExpiringSoon: false };
 
   // Enhanced color schemes - use stored color or fall back to type-based themes
   const getCardTheme = (card: CardType) => {
@@ -79,6 +84,7 @@ export function CardDisplay({ card }: CardDisplayProps) {
               {card.type === 'credit' ? 'Credit Card' : card.type === 'debit' ? 'Debit Card' : 'Card'} - ({card.name || card.type})
             </div>
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/30 rounded-full flex items-center justify-center backdrop-blur-sm shrink-0">
+              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
               <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
             </div>
           </div>
@@ -92,7 +98,7 @@ export function CardDisplay({ card }: CardDisplayProps) {
         <div className="space-y-1 sm:space-y-2">
           <div>
             <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Card Number</p>
-            <p className="text-xs sm:text-sm md:text-base font-mono tracking-[0.1em] sm:tracking-[0.12em] md:tracking-[0.15em] font-bold text-white break-all">{cardNumberDisplay}</p>
+            <p className="text-xs sm:text-sm md:text-base font-mono tracking-wide sm:tracking-wider md:tracking-widest font-bold text-white break-all">{cardNumberDisplay}</p>
             <p className="font-bold text-sm sm:text-base md:text-lg tracking-wide text-white truncate mt-1" title={card.cardHolder}>
               {card.cardHolder || 'Card Holder'}
             </p>

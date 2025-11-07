@@ -5,6 +5,9 @@ import { X } from 'lucide-react';
 import { cardsService } from '@/lib/firebase/firestore';
 import { Card } from '@/types';
 import toast from 'react-hot-toast';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/firebase/config';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EditCardModalProps {
   card: Card;
@@ -14,6 +17,7 @@ interface EditCardModalProps {
 }
 
 export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModalProps) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: card.name || '',
     balance: card.balance || 0,
@@ -22,8 +26,13 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
     creditLimit: card.creditLimit || 0,
     statementDay: card.statementDay || 1,
     paymentDueDay: card.paymentDueDay || 1,
+    overdraftLimit: card.overdraftLimit || 0,
+    paymentSourceCardId: card.paymentDebitCardId || '',
+    autoPayEnabled: card.autoPayEnabled || false,
+    minimumPayment: card.minimumPayment || 0,
   });
   const [loading, setLoading] = useState(false);
+  const [debitCards, setDebitCards] = useState<Array<{id: string, name: string, lastFour: string}>>([]);
 
   useEffect(() => {
     if (isOpen && card) {
@@ -35,9 +44,37 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
         creditLimit: card.creditLimit || 0,
         statementDay: card.statementDay || 1,
         paymentDueDay: card.paymentDueDay || 1,
+        overdraftLimit: card.overdraftLimit || 0,
+        paymentSourceCardId: card.paymentDebitCardId || '',
+        autoPayEnabled: card.autoPayEnabled || false,
+        minimumPayment: card.minimumPayment || 0,
       });
     }
   }, [isOpen, card]);
+
+  // Fetch debit cards when editing a credit card
+  useEffect(() => {
+    if (isOpen && user && card.type === 'credit') {
+      const fetchDebitCards = async () => {
+        try {
+          const cardsQuery = query(collection(db, 'cards'), 
+            where('userId', '==', user.uid),
+            where('type', '==', 'debit')
+          );
+          const cardsSnapshot = await getDocs(cardsQuery);
+          const debitCardsData = cardsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            name: doc.data().name || 'Unnamed Card',
+            lastFour: doc.data().lastFour || '****'
+          }));
+          setDebitCards(debitCardsData);
+        } catch (error) {
+          console.error('Error fetching debit cards:', error);
+        }
+      };
+      fetchDebitCards();
+    }
+  }, [isOpen, user, card.type]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,11 +89,16 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
         color: formData.color,
       };
 
-      // Only add credit card fields if it's a credit card
-      if (card.type === 'credit') {
+      // Add card type specific fields
+      if (card.type === 'debit') {
+        updateData.overdraftLimit = Number(formData.overdraftLimit) || undefined;
+      } else if (card.type === 'credit') {
         updateData.creditLimit = Number(formData.creditLimit);
         updateData.statementDay = Number(formData.statementDay);
         updateData.paymentDueDay = Number(formData.paymentDueDay);
+        updateData.paymentDebitCardId = formData.paymentSourceCardId || undefined;
+        updateData.autoPayEnabled = formData.autoPayEnabled;
+        updateData.minimumPayment = Number(formData.minimumPayment) || undefined;
       }
 
       await cardsService.update(card.id, updateData);
@@ -87,7 +129,7 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
@@ -96,6 +138,7 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
             onClick={onClose}
             className="text-slate-400 hover:text-slate-100 transition-colors"
           >
+            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -214,6 +257,97 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
                   ))}
                 </select>
                 <p className="text-slate-500 text-xs mt-1">Day of month when payment is due</p>
+              </div>
+            </>
+          )}
+
+          {/* Debit Card Specific Fields */}
+          {card.type === 'debit' && (
+            <>
+              {/* Overdraft Limit */}
+              <div>
+                <label htmlFor="edit-overdraft-limit" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                  Overdraft Limit
+                </label>
+                <input
+                  id="edit-overdraft-limit"
+                  type="number"
+                  step="50"
+                  value={formData.overdraftLimit || ''}
+                  onChange={(e) => setFormData({ ...formData, overdraftLimit: parseFloat(e.target.value) || 0 })}
+                  placeholder="500.00"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
+                />
+                <p className="text-slate-500 text-xs mt-1">Maximum overdraft amount allowed</p>
+              </div>
+            </>
+          )}
+
+          {/* Credit Card Specific Fields - Payment Source */}
+          {card.type === 'credit' && debitCards.length > 0 && (
+            <>
+              {/* Payment Source */}
+              <div>
+                <label htmlFor="edit-payment-source" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                  Payment Source
+                </label>
+                <select
+                  id="edit-payment-source"
+                  value={formData.paymentSourceCardId}
+                  onChange={(e) => setFormData({ ...formData, paymentSourceCardId: e.target.value })}
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
+                >
+                  <option value="">Select debit card for auto-payment</option>
+                  {debitCards.map((debitCard) => (
+                    <option key={debitCard.id} value={debitCard.id}>
+                      {debitCard.name} (****{debitCard.lastFour})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-slate-500 text-xs mt-1">Which debit card to use for automatic credit card payments</p>
+              </div>
+
+              {/* Auto Pay Toggle */}
+              <div>
+                <label className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                  Auto-Pay
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, autoPayEnabled: !formData.autoPayEnabled })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      formData.autoPayEnabled ? 'bg-amber-600' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        formData.autoPayEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <span className="text-sm text-slate-300">
+                    {formData.autoPayEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <p className="text-slate-500 text-xs mt-1">Automatically pay this credit card using the selected debit card</p>
+              </div>
+
+              {/* Minimum Payment */}
+              <div>
+                <label htmlFor="edit-minimum-payment" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+                  Minimum Payment
+                </label>
+                <input
+                  id="edit-minimum-payment"
+                  type="number"
+                  step="0.01"
+                  value={formData.minimumPayment || ''}
+                  onChange={(e) => setFormData({ ...formData, minimumPayment: parseFloat(e.target.value) || 0 })}
+                  placeholder="25.00"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
+                />
+                <p className="text-slate-500 text-xs mt-1">Minimum amount to pay each month (leave empty for 3% of balance or $25 minimum)</p>
               </div>
             </>
           )}

@@ -11,6 +11,7 @@ import dynamic from 'next/dynamic';
 import { CurrencySelector } from '../currency/CurrencySelector';
 import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import Image from 'next/image';
 
 type NavItem = {
   name: string;
@@ -33,11 +34,14 @@ const userNavigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
-  { name: 'Admin Dashboard', href: '/admin', icon: ShieldCheckIcon },
+  { name: 'Admin Overview', href: '/admin/overview', icon: ShieldCheckIcon },
+  { name: 'Message Center', href: '/admin/messaging', icon: TagIcon },
   { name: 'User Management', href: '/admin/users', icon: UserIcon },
-  { name: 'System Alerts', href: '/admin/alerts', icon: TagIcon },
-  { name: 'Setup', href: '/setup', icon: SparklesIcon },
-  { name: 'Admin Setup', href: '/setup-admin', icon: ShieldCheckIcon },
+  { name: 'Recurring Payments', href: '/admin/recurring', icon: CreditCardIcon },
+  { name: 'Messages', href: '/admin/messages', icon: TagIcon },
+  { name: 'System Alerts', href: '/admin/alerts', icon: SparklesIcon },
+  { name: 'Announcements', href: '/admin/announcements', icon: SparklesIcon },
+  { name: 'Data Cleanup', href: '/admin/cleanup', icon: CpuChipIcon },
   { name: 'Settings', href: '/admin/settings', icon: SparklesIcon },
 ];
 
@@ -107,22 +111,8 @@ export default function Sidebar() {
   };
 
   const renderNavLinks = () => {
-    // For admins, show both user and admin navigation
-    const currentNavigation = isAdmin ? [...userNavigation, ...adminNavigation] : userNavigation;
-
-    // Filter navigation based on subscription tier
-    const filteredNavigation = currentNavigation.filter((item) => {
-      // Hide premium-only items from free users
-      console.log('🎯 Sidebar filtering:', { tier, itemName: item.name, premiumOnly: item.premiumOnly });
-
-      if (item.premiumOnly && tier === 'free') {
-        console.log('❌ Hiding premium item:', item.name);
-        return false;
-      }
-      return true;
-    });
-
-    const links = filteredNavigation.map((item) => {
+    // Show user navigation for all users
+    const userLinks = userNavigation.map((item) => {
       const isActive = pathname === item.href;
       return (
         <Link
@@ -146,7 +136,32 @@ export default function Sidebar() {
       );
     });
 
-    return links;
+    // Show admin navigation only for admin users
+    const adminLinks = isAdmin ? adminNavigation.map((item) => {
+      const isActive = pathname === item.href;
+      return (
+        <Link
+          key={item.name}
+          href={item.href}
+          onClick={closeMobileMenu}
+          className={`group flex items-center px-4 py-4 text-sm transition-all duration-200 ${
+            isActive
+              ? 'border-l-2 border-red-500 bg-red-900/10 text-red-400'
+              : 'border-l-2 border-transparent text-slate-500 hover:border-red-500/50 hover:text-slate-300'
+          }`}
+        >
+          <item.icon
+            className={`mr-3 shrink-0 h-5 w-5 transition-colors ${
+              isActive ? 'text-red-400' : 'text-slate-600 group-hover:text-slate-400'
+            }`}
+            aria-hidden="true"
+          />
+          <span className="tracking-wide uppercase text-xs font-serif">{item.name}</span>
+        </Link>
+      );
+    }) : [];
+
+    return [...userLinks, ...adminLinks];
   };
 
   return (
@@ -194,6 +209,13 @@ export default function Sidebar() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-amber-900/30">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
+            <Image
+              src="/logo-64.png"
+              alt="SpendFlow Logo"
+              width={32}
+              height={32}
+              className="rounded"
+            />
             <h1 className="text-lg font-serif text-slate-100 tracking-widest">
               SPENDFLOW
             </h1>
@@ -216,9 +238,13 @@ export default function Sidebar() {
         <div className="flex flex-col w-64 border-r border-slate-800 bg-slate-900/50">
           <div className="flex flex-col flex-1 min-h-0">
             <div className="flex flex-col items-center justify-center h-24 shrink-0 px-4 bg-linear-to-r from-slate-800/50 to-slate-900/50">
-              <h1 className="text-xl font-serif text-slate-100 tracking-widest">
-                SPENDFLOW
-              </h1>
+              <Image
+                src="/logo-128.png"
+                alt="SpendFlow Logo"
+                width={64}
+                height={64}
+                className="rounded-lg"
+              />
               <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-(--theme-accent) to-transparent mt-3"></div>
             </div>
             <div className="flex flex-col grow mt-5">

@@ -5,13 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useAccessControl } from '@/lib/services/accessControlService';
 import { Plus, Award } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
-import { UpgradePrompt } from '@/components/subscription/UpgradePrompt';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { savingsAccountsService } from '@/lib/services/savingsService';
 import { DashboardAnalytics } from '@/components/dashboard/DashboardAnalytics';
@@ -38,8 +36,11 @@ function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const { formatAmount } = useCurrency();
-  const { tier, subscription } = useSubscription();
-  const { canAddCard, canAddTransaction } = useAccessControl();
+  const { tier } = useSubscription();
+
+  // Check if user is admin
+  const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
+  const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cards, setCards] = useState<CardType[]>([]);
@@ -49,10 +50,6 @@ function DashboardContent() {
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
   const [selectedCardType, setSelectedCardType] = useState<'credit' | 'debit'>('credit');
-  const [subscriptionWarnings, setSubscriptionWarnings] = useState<{
-    cards: boolean;
-    transactions: boolean;
-  }>({ cards: false, transactions: false });
   const [analyticsKey, setAnalyticsKey] = useState(0); // Force analytics re-render
 
   const hasCards = cards.length > 0;
@@ -69,29 +66,8 @@ function DashboardContent() {
 
   // Check subscription limits and show warnings
   const checkSubscriptionLimits = useCallback(async () => {
-    if (!user) return;
-
-    // Check if user is admin - admins don't have limits
-    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
-    const isAdmin = user.email && adminEmails.includes(user.email);
-
-    if (isAdmin) {
-      setSubscriptionWarnings({ cards: false, transactions: false });
-      return;
-    }
-
-    try {
-      const cardCheck = await canAddCard();
-      const transactionCheck = await canAddTransaction();
-
-      setSubscriptionWarnings({
-        cards: !cardCheck.allowed,
-        transactions: !transactionCheck.allowed,
-      });
-    } catch (error) {
-      console.error('Error checking subscription limits:', error);
-    }
-  }, [user, canAddCard, canAddTransaction]);
+    // No restrictions - always allow
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -196,13 +172,7 @@ function DashboardContent() {
       return;
     }
 
-    // Check transaction limits
-    const transactionCheck = await canAddTransaction();
-    if (!transactionCheck.allowed) {
-      // Don't show modal, the upgrade prompt will be visible
-      return;
-    }
-
+    // No subscription restrictions - always allow
     setShowTransactionModal(true);
   };
 
@@ -229,6 +199,7 @@ function DashboardContent() {
           <div className="bg-slate-900 border border-amber-700/30 rounded-lg p-8 max-w-md mx-4 text-center">
             <div className="mb-6">
               <div className="w-16 h-16 bg-amber-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                 <Plus className="h-8 w-8 text-amber-400" />
               </div>
               <h3 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">No Cards Found</h3>
@@ -256,6 +227,7 @@ function DashboardContent() {
             onClick={handleAddTransactionClick}
             className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 border border-(--theme-accent) text-(--theme-accent) hover:bg-(--theme-accent)/10 transition-colors tracking-wider uppercase text-sm w-full sm:w-auto justify-center"
           >
+            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
             <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
             <span className="hidden xs:inline">Add Transaction</span>
             <span className="xs:hidden">Add</span>
@@ -267,91 +239,27 @@ function DashboardContent() {
           <div className="flex items-center justify-between p-4 border border-slate-800 bg-slate-900/30 backdrop-blur-sm rounded-lg">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                 <Award className="h-5 w-5 text-white" />
               </div>
               <div>
                 <div className="text-slate-100 font-medium">
-                  {(() => {
-                    // Check if user is admin
-                    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
-                    const isAdmin = user?.email && adminEmails.includes(user.email);
-
-                    if (isAdmin) {
-                      return 'Administrator';
-                    }
-
-                    return tier === 'free' ? 'Essential' : tier === 'pro' ? 'Professional' : 'Enterprise';
-                  })()} Plan
+                  {isAdmin ? 'Administrator' : tier === 'free' ? 'Essential' : tier === 'premium' ? 'Professional' : 'Enterprise'} Plan
                 </div>
                 <div className="text-slate-400 text-sm">
-                  {(() => {
-                    // Check if user is admin
-                    const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
-                    const isAdmin = user?.email && adminEmails.includes(user.email);
-
-                    if (isAdmin) {
-                      return 'Unlimited access to all features';
-                    }
-
-                    return subscription?.currentPeriodEnd
-                      ? `Renews ${subscription.currentPeriodEnd.toLocaleDateString()}`
-                      : 'Free plan';
-                  })()}
+                  {isAdmin ? 'Unlimited access to all features' : 'Full access to all features'}
                 </div>
               </div>
             </div>
             <button
-              onClick={() => router.push('/subscription')}
               className={`px-4 py-2 font-medium rounded-lg transition-colors text-sm ${
-                (() => {
-                  // Check if user is admin
-                  const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
-                  const isAdmin = user?.email && adminEmails.includes(user.email);
-
-                  if (isAdmin) {
-                    return 'bg-purple-600 hover:bg-purple-700 text-white';
-                  }
-
-                  return tier === 'enterprise'
-                    ? 'bg-slate-600 hover:bg-slate-700 text-white'
-                    : 'bg-amber-500 hover:bg-amber-600 text-slate-900';
-                })()
+                isAdmin ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-600 hover:bg-slate-700 text-white'
               }`}
             >
-              {(() => {
-                // Check if user is admin
-                const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
-                const isAdmin = user?.email && adminEmails.includes(user.email);
-
-                if (isAdmin) {
-                  return 'Admin Panel';
-                }
-
-                return tier === 'enterprise' ? 'Manage Plan' : 'Upgrade';
-              })()}
+              {isAdmin ? 'Admin Panel' : 'Settings'}
             </button>
           </div>
         </div>
-
-        {/* Upgrade Prompts */}
-        {(subscriptionWarnings.cards || subscriptionWarnings.transactions) && (
-          <div className="mb-8 space-y-4">
-            {subscriptionWarnings.cards && (
-              <UpgradePrompt
-                title="Card Limit Reached"
-                message="You've reached your card limit. Upgrade to add more cards to your account."
-                feature="cards"
-              />
-            )}
-            {subscriptionWarnings.transactions && (
-              <UpgradePrompt
-                title="Transaction Limit Reached"
-                message="You've reached your transaction limit. Upgrade to add unlimited transactions."
-                feature="transactions"
-              />
-            )}
-          </div>
-        )}
 
         {/* Card Balance Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
@@ -423,6 +331,7 @@ function DashboardContent() {
                 className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
               >
                 <div className="text-(--theme-accent) mb-2 sm:mb-3">
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Award className="h-6 w-6 sm:h-8 sm:w-8 mx-auto" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2">{cards.length}</div>

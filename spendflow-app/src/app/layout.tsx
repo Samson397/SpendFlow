@@ -1,15 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import './globals.css';
 import { Inter } from 'next/font/google';
-import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
-import { Toaster } from '@/components/ui/use-toast';
-import './globals.css';
 
 // Import DeepSeek service for AI features
-import { DeepSeekInitializer } from '@/components/DeepSeekInitializer';
 import { validateEnvironment } from '@/lib/env-validation';
 
 // Validate environment variables on server startup
@@ -55,7 +51,7 @@ export const metadata: Metadata = {
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-256.png', sizes: '256x256', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-      { url: '/logo.png', sizes: 'any', type: 'image/png' },
+      { url: '/logo-main.png', sizes: 'any', type: 'image/png' },
     ],
     shortcut: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -83,17 +79,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${inter.variable} font-sans h-full bg-slate-900 text-slate-100 antialiased`}>
+      <body className="h-full bg-slate-900 text-slate-100">
         <AuthProvider>
           <CurrencyProvider>
-            <ThemeProvider>
-              <ErrorBoundary>
-                <ServiceWorkerRegistration />
-                <DeepSeekInitializer />
-                {children}
-                <Toaster />
-              </ErrorBoundary>
-            </ThemeProvider>
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </CurrencyProvider>
         </AuthProvider>
       </body>

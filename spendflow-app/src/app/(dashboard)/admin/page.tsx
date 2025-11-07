@@ -3,44 +3,31 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import dynamic from 'next/dynamic';
-import { 
-  collection, 
-  getCountFromServer, 
-  query, 
+import {
+  collection,
+  getCountFromServer,
+  query,
   where,
   limit,
-  getFirestore, 
-  doc, 
+  getFirestore,
+  doc,
   getDoc,
   QueryConstraint,
   Timestamp,
   getDocs
 } from 'firebase/firestore';
 import { db } from '@/firebase/config';
-import { 
-  CreditCard, 
-  MessageSquare, 
-  Settings,
-  ShieldCheckIcon
-} from 'lucide-react';
+import {
+  UsersIcon as Users,
+  CreditCardIcon as CreditCard,
+  TagIcon,
+  SparklesIcon,
+  ShieldCheckIcon,
+  ChatBubbleLeftRightIcon as MessageSquare,
+  ServerStackIcon as Database
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
-
-// Dynamically import the RecentActivities component
-const RecentActivities = dynamic(
-  () => import('@/components/admin/RecentActivities'),
-  { ssr: false }
-);
-
-// Dynamically import the AdminTabs component to avoid SSR issues with Firebase
-const AdminTabs = dynamic(() => import('@/components/admin/AdminTabs'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-2 border-amber-400 border-t-transparent"></div>
-    </div>
-  ),
-});
 
 type SystemHealthStatus = 'operational' | 'degraded' | 'maintenance';
 
@@ -469,30 +456,30 @@ export default function AdminPage() {
           <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
             <h3 className="text-lg font-medium text-slate-100 mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button 
+              <button
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => router.push('/dashboard')}
               >
                 <CreditCard className="h-6 w-6 mx-auto mb-2 text-amber-400" />
                 <span className="text-sm">My Transactions</span>
               </button>
-              <button 
+              <button
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => router.push('/login')}
               >
                 <MessageSquare className="h-6 w-6 mx-auto mb-2 text-purple-400" />
                 <span className="text-sm">Contact Support</span>
               </button>
-              <button 
+              <button
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => router.push('/dashboard')}
               >
-                <Settings className="h-6 w-6 mx-auto mb-2 text-green-400" />
+                <SparklesIcon className="h-6 w-6 mx-auto mb-2 text-green-400" />
                 <span className="text-sm">Account Settings</span>
               </button>
             </div>
           </div>
-          
+
           {/* Recent Transactions Table */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
             <h3 className="text-lg font-medium text-slate-100 mb-4">Recent Transactions</h3>
@@ -521,17 +508,20 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Right Column - Recent Activity */}
         <div className="lg:col-span-1">
           <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-            <RecentActivities />
+            <div className="text-center py-8">
+              <ShieldCheckIcon className="h-12 w-12 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">Recent Activity</p>
+              <p className="text-xs text-slate-500 mt-1">Activity feed would be displayed here</p>
+            </div>
           </div>
         </div>
       </div>
     );
   }
-
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -549,8 +539,192 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Dashboard Content */}
-        <AdminTabs stats={stats} onRefresh={loadStats} />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-sm">Total Users</p>
+                <p className="text-2xl font-bold text-slate-100">{stats.totalUsers}</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-400" />
+            </div>
+          </div>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-sm">Total Cards</p>
+                <p className="text-2xl font-bold text-slate-100">{stats.totalCards}</p>
+              </div>
+              <CreditCard className="h-8 w-8 text-amber-400" />
+            </div>
+          </div>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-sm">Transactions</p>
+                <p className="text-2xl font-bold text-slate-100">{stats.totalTransactions}</p>
+              </div>
+              <Database className="h-8 w-8 text-green-400" />
+            </div>
+          </div>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-sm">Messages</p>
+                <p className="text-2xl font-bold text-slate-100">{stats.totalMessages}</p>
+                {stats.newMessages > 0 && (
+                  <p className="text-xs text-red-400">{stats.newMessages} new</p>
+                )}
+              </div>
+              <MessageSquare className="h-8 w-8 text-purple-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Admin Management Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Link
+            href="/admin/overview"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-900/30 rounded-lg group-hover:bg-red-900/50 transition-colors">
+                <ShieldCheckIcon className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">Admin Overview</h3>
+                <p className="text-sm text-slate-400">Real-time monitoring dashboard</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/messaging"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-900/30 rounded-lg group-hover:bg-blue-900/50 transition-colors">
+                <MessageSquare className="h-6 w-6 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">Message Center</h3>
+                <p className="text-sm text-slate-400">Respond to user inquiries</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/users"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-900/30 rounded-lg group-hover:bg-blue-900/50 transition-colors">
+                <Users className="h-6 w-6 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">User Management</h3>
+                <p className="text-sm text-slate-400">Manage user accounts and permissions</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/recurring"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-amber-900/30 rounded-lg group-hover:bg-amber-900/50 transition-colors">
+                <CreditCard className="h-6 w-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">Recurring Payments</h3>
+                <p className="text-sm text-slate-400">Process automatic credit card payments</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/messages"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-green-900/30 rounded-lg group-hover:bg-green-900/50 transition-colors">
+                <MessageSquare className="h-6 w-6 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">Messages</h3>
+                <p className="text-sm text-slate-400">View and manage user contact messages</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/alerts"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-900/30 rounded-lg group-hover:bg-red-900/50 transition-colors">
+                <SparklesIcon className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">System Alerts</h3>
+                <p className="text-sm text-slate-400">Monitor and manage system alerts</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/announcements"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-900/30 rounded-lg group-hover:bg-purple-900/50 transition-colors">
+                <SparklesIcon className="h-6 w-6 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">Announcements</h3>
+                <p className="text-sm text-slate-400">Create and manage system announcements</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/cleanup"
+            className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:bg-slate-800/30 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-slate-700/50 rounded-lg group-hover:bg-slate-600/50 transition-colors">
+                <Database className="h-6 w-6 text-slate-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-slate-100">Data Cleanup</h3>
+                <p className="text-sm text-slate-400">Database maintenance and cleanup tools</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* System Health */}
+        <div className="mt-8 bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-slate-100">System Health</h3>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                stats.systemHealth === 'operational'
+                  ? 'bg-green-900/30 text-green-400'
+                  : stats.systemHealth === 'degraded'
+                  ? 'bg-yellow-900/30 text-yellow-400'
+                  : 'bg-red-900/30 text-red-400'
+              }`}>
+                {stats.systemHealth.charAt(0).toUpperCase() + stats.systemHealth.slice(1)}
+              </span>
+            </div>
+          </div>
+          <p className="text-slate-400 text-sm">
+            System is {stats.systemHealth}. Last updated: Just now.
+          </p>
+        </div>
       </div>
     </div>
   );

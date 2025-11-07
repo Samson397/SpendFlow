@@ -27,8 +27,7 @@ function CardsPageContent() {
     const loadCards = async () => {
       if (user) {
         try {
-          const allCards = await cardsService.getAll();
-          const userCards = allCards.filter(card => card.userId === user.uid);
+          const userCards = await cardsService.getByUserId(user.uid);
           setCards(userCards);
         } catch (error) {
           console.error('Error loading cards:', error);
@@ -173,6 +172,7 @@ function CardsPageContent() {
           onClick={handleAddCardClick}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
         >
+          {/* @ts-expect-error Conflicting React types between lucide-react and project */}
           <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
           Add Card
         </button>
@@ -202,28 +202,30 @@ function CardsPageContent() {
                 
                 {/* Action Buttons - Modern Design - Hidden when modals are open or sidebar is open */}
                 {!(showModal || showEditModal) && (
-                  <div className="absolute bottom-4 right-4 flex gap-2 z-20 md:z-50">
+                  <div className="absolute top-4 right-4 flex gap-2 z-20">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleEditClick(card);
                       }}
-                      className="group relative w-10 h-10 md:w-8 md:h-8 bg-white/20 md:bg-white/10 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 md:border-white/20 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation md:pointer-events-auto pointer-events-none md:opacity-100 opacity-0"
+                      className="group relative w-10 h-10 bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation"
                       aria-label="Edit card"
                     >
-                      <Edit2 className="h-4 w-4 md:h-3 md:w-3 group-hover:scale-110 transition-transform duration-200" />
-                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-blue-500/30 to-purple-500/30 md:from-blue-500/20 md:to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
+                      <Edit2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-blue-500/30 to-purple-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteClick(card.id);
                       }}
-                      className="group relative w-10 h-10 md:w-8 md:h-8 bg-white/20 md:bg-white/10 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 md:border-white/20 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation md:pointer-events-auto pointer-events-none md:opacity-100 opacity-0"
+                      className="group relative w-10 h-10 bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation"
                       aria-label="Delete card"
                     >
-                      <Trash2 className="h-4 w-4 md:h-3 md:w-3 group-hover:scale-110 transition-transform duration-200" />
-                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-red-500/30 to-orange-500/30 md:from-red-500/20 md:to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
+                      <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-red-500/30 to-orange-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                     </button>
                   </div>
                 )}
@@ -234,6 +236,7 @@ function CardsPageContent() {
       ) : (
         <div className="text-center py-12 sm:py-16 md:py-20 border border-slate-800 bg-slate-900/40 rounded-lg backdrop-blur-sm">
           <div className="text-amber-400 mb-4">
+            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
             <Award className="h-12 w-12 sm:h-16 sm:w-16 mx-auto opacity-80" />
           </div>
           <h3 className="text-xl sm:text-2xl font-serif text-slate-100 mb-3 font-semibold">No Cards Yet</h3>

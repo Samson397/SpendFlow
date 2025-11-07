@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { monitorAllUsersStatus } from '@/lib/firebase/presence';
 import { usersService } from '@/lib/firebase/firestore';
-import { User, Users, Circle } from 'lucide-react';
+import { UserIcon as User, Users, Circle } from 'lucide-react';
 import type { UserProfile } from '@/types';
 
 interface OnlineUser {
@@ -13,7 +13,7 @@ interface OnlineUser {
   online: boolean;
 }
 
-export const OnlineUsers = () => {
+export default function OnlineUsers() {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(true); // Start as true since we need to load profiles first
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});

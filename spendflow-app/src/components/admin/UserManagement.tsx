@@ -5,10 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usersService } from '@/lib/firebase/firestore';
 import { monitorAllUsersStatus } from '@/lib/firebase/presence';
 import { toast } from 'react-hot-toast';
-import { Search, Filter, Clock, Eye, User, UserCheck, UserX, Shield, Crown, Star } from 'lucide-react';
+import { Search, Filter, Clock, Eye, User, UserCheck, UserX, Shield } from 'lucide-react';
 import { UserProfile } from '@/types';
 import { alertsService } from '@/lib/alerts';
-import { subscriptionService } from '@/lib/services/subscriptionService';
 
 // Helper function to format time ago
 const getTimeAgo = (dateString?: string | Date) => {
@@ -210,105 +209,6 @@ export default function UserManagement() {
     }
   };
 
-  const updateUserSubscription = async (userId: string, newTier: 'free' | 'pro' | 'enterprise') => {
-    console.log('🔄 [updateUserSubscription] Starting update:', { userId, newTier, selectedUser });
-
-    try {
-      console.log('📝 [updateUserSubscription] Getting plans...');
-      // Get plans to find the correct plan for the tier
-      const plans = await subscriptionService.getPlans();
-      const targetPlan = plans.find(p => p.tier === newTier);
-
-      if (!targetPlan) {
-        throw new Error(`Plan not found for tier: ${newTier}`);
-      }
-
-      console.log('📝 [updateUserSubscription] Found target plan:', targetPlan.id, targetPlan.tier);
-
-      // Check if user already has a subscription
-      const existingSubscription = await subscriptionService.getUserSubscription(userId);
-      console.log('📝 [updateUserSubscription] Existing subscription:', existingSubscription?.id, existingSubscription?.status);
-
-      if (existingSubscription) {
-        // Update existing subscription
-        console.log('📝 [updateUserSubscription] Updating existing subscription...');
-        await subscriptionService.updateSubscription(userId, existingSubscription.id, {
-          planId: targetPlan.id
-        });
-      } else {
-        // Create new subscription
-        console.log('📝 [updateUserSubscription] Creating new subscription...');
-        await subscriptionService.createSubscription(userId, { planId: targetPlan.id });
-      }
-
-      // Also update user profile for consistency
-      console.log('📝 [updateUserSubscription] Updating user profile...');
-      await usersService.updateTier(userId, newTier);
-
-      console.log('✅ [updateUserSubscription] Database update successful');
-
-      console.log('🔄 [updateUserSubscription] Updating local state...');
-      setUsers(users.map(user => {
-        if (user.id === userId) {
-          // Update both subscription tier and features based on the new tier
-          const features = {
-            free: { maxCards: 2, maxTransactions: 100, analytics: false, export: false, prioritySupport: false, apiAccess: false, teamManagement: false, customIntegrations: false },
-            pro: { maxCards: 10, maxTransactions: 1000, analytics: true, export: true, prioritySupport: false, apiAccess: false, teamManagement: false, customIntegrations: false },
-            enterprise: { maxCards: 50, maxTransactions: 10000, analytics: true, export: true, prioritySupport: true, apiAccess: true, teamManagement: true, customIntegrations: true }
-          };
-
-          return {
-            ...user,
-            subscriptionTier: newTier,
-            subscription: {
-              ...user.subscription,
-              tier: newTier,
-              status: 'active',
-              updatedAt: new Date()
-            },
-            features: features[newTier]
-          };
-        }
-        return user;
-      }));
-
-      console.log('✅ [updateUserSubscription] Local state updated');
-
-      const tierNames = { free: 'Free', pro: 'Pro', enterprise: 'Enterprise' };
-      console.log('🔔 [updateUserSubscription] Showing success toast');
-      toast.success(`User subscription updated to ${tierNames[newTier]} tier`);
-
-      // If updating current user's subscription, force refresh subscription context
-      if (userId === currentUser?.uid) {
-        console.log('🔄 [updateUserSubscription] Force refreshing subscription context...');
-        try {
-          // Clear any potential cache
-          localStorage.removeItem('subscription_cache');
-          sessionStorage.removeItem('subscription_cache');
-          window.location.reload();
-        } catch (refreshError) {
-          console.warn('Could not force refresh, falling back to regular reload');
-          window.location.reload();
-        }
-      }
-
-      // Close the modal after successful update
-      setSelectedUser(null);
-
-      // Generate admin action alert
-      try {
-        await alertsService.adminAction(currentUser?.email || 'Unknown Admin', `Changed user subscription to ${tierNames[newTier]}`, userId);
-      } catch (alertError) {
-        console.warn('Failed to create subscription change alert:', alertError);
-      }
-
-      console.log('🎉 [updateUserSubscription] Update completed successfully');
-    } catch (error) {
-      console.error('❌ [updateUserSubscription] Error updating user subscription:', error);
-      toast.error('Failed to update user subscription');
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -444,9 +344,6 @@ export default function UserManagement() {
                     Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                    Subscription
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                     Role
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -522,29 +419,6 @@ export default function UserManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                        {/* Subscription Tier */}
-                        <div className="flex items-center gap-2">
-                          {(user.subscriptionTier === 'free' || !user.subscriptionTier) && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-900/30 text-gray-400">
-                              <User className="h-3 w-3 mr-1" />
-                              Free
-                            </span>
-                          )}
-                          {user.subscriptionTier === 'pro' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-900/30 text-blue-400">
-                              <Star className="h-3 w-3 mr-1" />
-                              Pro
-                            </span>
-                          )}
-                          {user.subscriptionTier === 'enterprise' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400">
-                              <Crown className="h-3 w-3 mr-1" />
-                              Enterprise
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
                         {/* User role */}
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           user.isAdmin 
@@ -617,7 +491,7 @@ export default function UserManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                       <User className="h-12 w-12 mx-auto text-slate-600 mb-2" />
                       <p>No users found</p>
                       <p className="text-sm mt-1">Try adjusting your search or filter criteria</p>

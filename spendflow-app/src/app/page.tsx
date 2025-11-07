@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -28,9 +29,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="shrink-0">
-              <h1 className="text-lg sm:text-2xl font-serif text-slate-100 tracking-wider">
-                S P E N D F L O W
-              </h1>
+              <Image
+                src="/logo-128.png"
+                alt="SpendFlow Logo"
+                width={220}
+                height={44}
+                className="h-11 w-auto"
+              />
             </div>
             <nav className="flex items-center space-x-2 sm:space-x-4">
               {!loading && user ? (
@@ -106,13 +111,13 @@ export default function Home() {
         <section className="relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 md:py-24">
             <div className="text-center max-w-4xl mx-auto">
-              <div className="w-16 sm:w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6 sm:mb-12"></div>
+              <div className="w-16 sm:w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6 sm:mb-12"></div>
               
               <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-slate-100 mb-4 sm:mb-6 tracking-tight leading-tight">
                 Complete <span className="text-amber-400 block sm:inline">Financial Control</span>
               </h2>
 
-              <div className="w-24 sm:w-32 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto my-6 sm:my-8"></div>
+              <div className="w-24 sm:w-32 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto my-6 sm:my-8"></div>
               
               <p className="text-base sm:text-lg md:text-xl text-slate-400 mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed">
                 Master your finances with enterprise-grade tools. Track every transaction, manage multiple cards, analyze spending patterns, export data, and scale from personal finance to business accounting—all in one powerful platform.
@@ -145,7 +150,7 @@ export default function Home() {
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100 mb-4">
                 Enterprise-Grade Financial Management
               </h2>
-              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto"></div>
+              <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto"></div>
               <p className="text-slate-400 mt-4 max-w-2xl mx-auto">
                 From personal finance to business accounting - SpendFlow scales with your needs
               </p>
@@ -288,19 +293,20 @@ export default function Home() {
 
               <Link
                 href="/signup?plan=professional"
-                className="bg-gradient-to-br from-amber-600/20 via-amber-500/10 to-orange-500/20 border-2 border-amber-500 rounded-xl p-6 relative shadow-lg hover:shadow-amber-500/30 transition-all duration-300 transform hover:scale-105 cursor-pointer group"
+                className="bg-linear-to-br from-amber-600/20 via-amber-500/10 to-orange-500/20 border-2 border-amber-500 rounded-xl p-6 relative shadow-lg hover:shadow-amber-500/30 transition-all duration-300 transform hover:scale-105 cursor-pointer group"
               >
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                  <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-500 text-slate-900 px-4 py-2 text-sm font-black rounded-full shadow-xl border-2 border-white/20 backdrop-blur-sm">
+                  <span className="bg-linear-to-r from-amber-500 via-yellow-400 to-orange-500 text-slate-900 px-4 py-2 text-sm font-black rounded-full shadow-xl border-2 border-white/20 backdrop-blur-sm">
                     <span className="flex items-center gap-1">
                       <span className="text-lg">⭐</span>
                       <span className="font-extrabold tracking-wide">MOST POPULAR</span>
                       <span className="text-lg">⭐</span>
                     </span>
+                  </span>
                   </div>
                 </div>
                 <div className="text-center pt-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-amber-400/50 transition-shadow">
+                  <div className="w-12 h-12 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-amber-400/50 transition-shadow">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
@@ -340,7 +346,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/signup"
-                className="px-8 py-3 sm:py-4 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-bold rounded-lg transition-all duration-300 text-sm sm:text-base flex items-center justify-center min-h-[48px] shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="px-8 py-3 sm:py-4 bg-linear-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-bold rounded-lg transition-all duration-300 text-sm sm:text-base flex items-center justify-center min-h-[48px] shadow-lg hover:shadow-xl transform hover:scale-105"
                 aria-label="Start with Professional plan"
               >
                 🚀 Start Professional Plan - $4.99/mo
@@ -362,7 +368,7 @@ export default function Home() {
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="flex flex-col h-full max-h-[90vh]">
               {/* Modal Header - Fixed */}
-              <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-800 flex-shrink-0">
+              <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-800 shrink-0">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2">
                     📊 Plan Comparison
@@ -371,7 +377,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => setShowComparison(false)}
-                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors shrink-0"
                 >
                   <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -405,13 +411,13 @@ export default function Home() {
                           Get Started
                         </Link>
                       </div>
-                      <div className="p-4 bg-gradient-to-br from-amber-600/20 via-amber-500/10 to-orange-500/20 border-2 border-amber-500 rounded-lg text-center relative">
+                      <div className="p-4 bg-linear-to-br from-amber-600/20 via-amber-500/10 to-orange-500/20 border-2 border-amber-500 rounded-lg text-center relative">
                         <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                          <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 px-3 py-1 text-xs font-black rounded-full">
+                          <span className="bg-linear-to-r from-amber-500 to-orange-500 text-slate-900 px-3 py-1 text-xs font-black rounded-full">
                             ⭐ MOST POPULAR
                           </span>
                         </div>
-                        <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-2 mt-2">
+                        <div className="w-10 h-10 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-2 mt-2">
                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                           </svg>
@@ -421,7 +427,7 @@ export default function Home() {
                         <Link
                           href="/signup?plan=professional"
                           onClick={() => setShowComparison(false)}
-                          className="inline-block px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-bold rounded-lg text-sm transition-all duration-300 shadow-lg hover:shadow-xl"
+                          className="inline-block px-4 py-2 bg-linear-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-bold rounded-lg text-sm transition-all duration-300 shadow-lg hover:shadow-xl"
                         >
                           🚀 Start Now
                         </Link>
@@ -530,8 +536,8 @@ export default function Home() {
                       <div className="grid grid-cols-4 gap-4 py-3">
                         <div className="text-slate-300 font-medium">Custom Integrations</div>
                         <div className="text-center text-red-400">✗</div>
-                      <div className="text-center text-red-400">✗</div>
-                      <div className="text-center text-slate-400">🚧 Coming soon</div>
+                        <div className="text-center text-red-400">✗</div>
+                        <div className="text-center text-slate-400">🚧 Coming soon</div>
                         <div className="text-center text-green-400">✓ White-label options</div>
                       </div>
                     </div>
@@ -540,7 +546,7 @@ export default function Home() {
               </div>
 
               {/* Modal Footer - Fixed */}
-              <div className="border-t border-slate-800 p-6 sm:p-8 flex-shrink-0">
+              <div className="border-t border-slate-800 p-6 sm:p-8 shrink-0">
                 {/* Coming Soon Features */}
                 <div className="mb-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg">
                   <h4 className="text-blue-400 font-semibold mb-3 flex items-center gap-2">
@@ -574,7 +580,7 @@ export default function Home() {
                   <Link
                     href="/signup?plan=professional"
                     onClick={() => setShowComparison(false)}
-                    className="px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-bold rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                    className="px-6 py-3 bg-linear-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-bold rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
                   >
                     🚀 Choose Professional Plan
                   </Link>

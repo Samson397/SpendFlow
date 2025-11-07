@@ -68,6 +68,7 @@ export interface Card {
   type: 'credit' | 'debit';
   balance: number;
   limit?: number;
+  overdraftLimit?: number; // For debit cards - maximum overdraft amount
   color: string;
   isActive: boolean;
   // Credit card specific fields

@@ -3,13 +3,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Mail, Shield, Calendar, MessageSquare, Edit2, Check, X } from 'lucide-react';
 import { AuthGate } from '@/components/auth/AuthGate';
-import { useSubscription } from '@/contexts/SubscriptionContext';
-import { SubscriptionManager } from '@/components/subscription/SubscriptionManager';
 import { DataExport } from '@/components/export/DataExport';
 import { AdvancedAnalytics } from '@/components/analytics/AdvancedAnalytics';
-import { TeamCollaboration } from '@/components/team/TeamCollaboration';
 import { UserAdminMessaging } from '@/components/messaging/UserAdminMessaging';
 import { DeviceManagement } from '@/components/profile/DeviceManagement';
+import { UpcomingPayments } from '@/components/payments/UpcomingPayments';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { updateProfile } from 'firebase/auth';
@@ -18,7 +16,6 @@ import { db } from '@/firebase/config';
 
 function ProfilePageContent() {
   const { user } = useAuth();
-  const { theme } = useSubscription();
   const [showMessagingModal, setShowMessagingModal] = useState(false);
   const [analyticsKey, setAnalyticsKey] = useState(0); // Force analytics re-render
   const [isEditingName, setIsEditingName] = useState(false);
@@ -108,6 +105,7 @@ function ProfilePageContent() {
         <div className="bg-linear-to-br from-amber-900/20 via-slate-900/50 to-slate-900/20 border border-amber-700/30 rounded-lg p-6 sm:p-8 md:p-10 lg:p-12 backdrop-blur-sm">
           <div className="text-center mb-8 sm:mb-10 md:mb-12">
             <div className="w-16 sm:w-20 md:w-24 h-16 sm:h-20 md:h-24 bg-slate-800 rounded-full mx-auto mb-4 sm:mb-6 flex items-center justify-center border-2 border-amber-600">
+              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
               <User className="h-8 sm:h-10 md:h-12 w-8 sm:w-10 md:w-12 text-amber-400" />
             </div>
             
@@ -129,6 +127,7 @@ function ProfilePageContent() {
                     disabled={savingName || !editingName.trim()}
                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
+                    {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                     <Check className="h-4 w-4" />
                     {savingName ? 'Saving...' : 'Save'}
                   </button>
@@ -137,6 +136,7 @@ function ProfilePageContent() {
                     disabled={savingName}
                     className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
+                    {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                     <X className="h-4 w-4" />
                     Cancel
                   </button>
@@ -150,6 +150,7 @@ function ProfilePageContent() {
                   className="p-1 text-amber-400 hover:text-amber-300 transition-colors"
                   title="Edit name"
                 >
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Edit2 className="h-5 w-5" />
                 </button>
               </div>
@@ -162,6 +163,7 @@ function ProfilePageContent() {
             <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 rounded-lg">
               <div className="border-l-2 border-amber-600 pl-3 sm:pl-4 md:pl-6">
                 <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
                   <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Email</div>
                 </div>
@@ -172,16 +174,18 @@ function ProfilePageContent() {
             <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 rounded-lg">
               <div className="border-l-2 border-amber-600 pl-3 sm:pl-4 md:pl-6">
                 <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
                   <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Account Status</div>
                 </div>
-                <div className="text-base sm:text-lg font-serif text-slate-100">{theme.name} Plan</div>
+                <div className="text-base sm:text-lg font-serif text-slate-100">Unlimited Access</div>
               </div>
             </div>
 
             <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 rounded-lg">
               <div className="border-l-2 border-amber-600 pl-3 sm:pl-4 md:pl-6">
                 <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
                   <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Member Since</div>
                 </div>
@@ -194,14 +198,14 @@ function ProfilePageContent() {
         </div>
       </div>
 
-      {/* Subscription Management */}
-      <div className="max-w-4xl mx-auto">
-        <SubscriptionManager />
-      </div>
-
       {/* Device Management */}
       <div className="max-w-4xl mx-auto">
         <DeviceManagement />
+      </div>
+
+      {/* Upcoming Payments */}
+      <div className="max-w-4xl mx-auto">
+        <UpcomingPayments />
       </div>
 
       {/* Data Export */}
@@ -214,15 +218,11 @@ function ProfilePageContent() {
         <AdvancedAnalytics key={analyticsKey} />
       </div>
 
-      {/* Team Collaboration */}
-      <div className="max-w-4xl mx-auto">
-        <TeamCollaboration />
-      </div>
-
       {/* Support & Messages */}
       <div className="max-w-4xl mx-auto">
         <div className="bg-linear-to-br from-amber-900/20 via-slate-900/50 to-slate-900/20 border border-amber-700/30 rounded-lg p-6 sm:p-8 md:p-10 lg:p-12 backdrop-blur-sm">
           <div className="text-center">
+            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
             <MessageSquare className="h-12 sm:h-16 md:h-20 w-12 sm:w-16 md:w-20 text-amber-400 mx-auto mb-4 sm:mb-6" />
             <h3 className="text-xl sm:text-2xl md:text-3xl font-serif text-slate-100 mb-2 sm:mb-4">Support & Messages</h3>
             <p className="text-slate-400 text-sm sm:text-base mb-6 sm:mb-8 max-w-2xl mx-auto">
@@ -237,6 +237,7 @@ function ProfilePageContent() {
               
               {/* Main button content */}
               <div className="relative flex items-center gap-2">
+                {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                 <MessageSquare className="h-5 w-5 group-hover:animate-bounce" />
                 <span>Open Support & Messages</span>
                 

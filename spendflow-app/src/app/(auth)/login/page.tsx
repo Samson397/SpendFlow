@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
 import { DeviceManagementService, PersistentAuthService } from '@/lib/services/deviceManagementService';
+import Image from 'next/image';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
@@ -132,9 +133,15 @@ function LoginContent() {
         {/* Header */}
         <div className="text-center">
           <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-8"></div>
-          <h1 className="text-5xl font-serif text-slate-100 mb-4 tracking-wide">
-            S P E N D F L O W
-          </h1>
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/logo-128.png"
+              alt="SpendFlow Logo"
+              width={80}
+              height={80}
+              className="rounded-lg"
+            />
+          </div>
           <div className="w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
           <h2 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">
             Welcome Back

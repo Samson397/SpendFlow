@@ -3,53 +3,14 @@
 import { AIAssistant } from '@/components/ai/AIAssistant';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 
 function AIAssistantContent() {
   const { tier } = useSubscription();
-  const router = useRouter();
 
   console.log('🤖 AI Page - Subscription tier:', tier);
   console.log('🤖 AI Page - User subscription status');
 
-  useEffect(() => {
-    // Redirect free users away from AI assistant
-    console.log('🔄 AI Page redirect check:', { tier, shouldRedirect: tier === 'free' });
-    if (tier === 'free') {
-      console.log('🚫 Redirecting free user to subscription page');
-      router.replace('/subscription');
-    } else {
-      console.log('✅ Allowing access for tier:', tier);
-    }
-  }, [tier, router]);
-
-  // Don't render anything if user is on free plan
-  if (tier === 'free') {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800 rounded-lg p-6 text-center border border-amber-500/20">
-          <div className="text-amber-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-serif text-slate-100 mb-2">
-            Premium Feature
-          </h2>
-          <p className="text-slate-400 mb-6 text-sm">
-            AI Financial Assistant is available for Pro and Enterprise users. Upgrade your plan to access personalized AI insights!
-          </p>
-          <button
-            onClick={() => router.push('/subscription')}
-            className="w-full px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors font-medium"
-          >
-            Upgrade to Pro
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Remove premium restriction - allow all users to access AI assistant
 
   return (
     <div className="min-h-screen bg-slate-950">

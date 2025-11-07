@@ -1,52 +1,13 @@
 /**
- * Access Control Service for Subscription-Based Features
+ * Access Control Service - No Subscription Limits
  *
- * This service provides utilities to check user permissions, enforce subscription limits,
- * and manage feature access based on the user's current subscription plan.
+ * Since the subscription system has been removed, all users now have unlimited access
+ * to all features. This service maintains the same interface for backwards compatibility.
  */
 
 import { useState, useEffect } from 'react';
-import { subscriptionService } from '@/lib/services/subscriptionService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSubscription } from '@/contexts/SubscriptionContext';
 import { PlanLimits } from '@/types';
-
-// Get default limits for current tier (fallback)
-const getDefaultLimits = (tier: string): PlanLimits => {
-  const limits: Record<string, PlanLimits> = {
-    free: {
-      maxCards: 2,
-      maxTransactions: 10,
-      analytics: false,
-      export: false,
-      prioritySupport: false,
-      apiAccess: false,
-      teamManagement: false,
-      customIntegrations: false,
-    },
-    pro: {
-      maxCards: 5,
-      maxTransactions: -1, // unlimited
-      analytics: true,
-      export: true,
-      prioritySupport: false,
-      apiAccess: false,
-      teamManagement: false,
-      customIntegrations: false,
-    },
-    enterprise: {
-      maxCards: -1, // unlimited
-      maxTransactions: -1, // unlimited
-      analytics: true,
-      export: true,
-      prioritySupport: true,
-      apiAccess: true,
-      teamManagement: true,
-      customIntegrations: true,
-    },
-  };
-  return limits[tier] || limits.free;
-};
 
 export interface AccessCheckResult {
   allowed: boolean;
@@ -80,65 +41,20 @@ class AccessControlService {
 
   /**
    * Check if a user can access a specific feature
+   * Since subscription system was removed, all features are now available to all users
    */
   async checkFeatureAccess(
     userId: string,
     feature: keyof PlanLimits,
     options: { currentCount?: number } = {}
   ): Promise<AccessCheckResult> {
-    try {
-      // Check if user is admin - admins get unlimited access to everything
-      if (await this.isUserAdmin(userId)) {
-        return {
-          allowed: true,
-          reason: 'Admin access - no limits applied',
-          currentUsage: options.currentCount,
-          limit: -1, // unlimited
-        };
-      }
-
-      // Get user's subscription limits
-      const userLimits = await subscriptionService.getUserLimits(userId);
-
-      // Check if the feature is enabled for this plan
-      if (!userLimits[feature]) {
-        return {
-          allowed: false,
-          reason: `This feature is not available on your current plan`,
-          upgradeRequired: true,
-        };
-      }
-
-      // For count-based limits, check current usage
-      if (options.currentCount !== undefined && typeof userLimits[feature] === 'number') {
-        const limit = userLimits[feature] as number;
-
-        // Unlimited (-1) or not yet reached limit
-        if (limit === -1 || options.currentCount < limit) {
-          return {
-            allowed: true,
-            currentUsage: options.currentCount,
-            limit: limit === -1 ? undefined : limit,
-          };
-        }
-
-        // Limit reached
-        return {
-          allowed: false,
-          reason: `You've reached your plan limit of ${limit} ${feature}`,
-          upgradeRequired: true,
-          currentUsage: options.currentCount,
-          limit,
-        };
-      }
-
-      return { allowed: true };
-
-    } catch (error) {
-      console.error('Error checking feature access:', error);
-      // Default to allowing access on error to avoid blocking users
-      return { allowed: true, reason: 'Unable to verify access, proceeding...' };
-    }
+    // All users now have unlimited access to all features
+    return {
+      allowed: true,
+      reason: 'Unlimited access - subscription system removed',
+      currentUsage: options.currentCount,
+      limit: -1, // unlimited
+    };
   }
 
   /**
@@ -196,24 +112,47 @@ class AccessControlService {
 
   /**
    * Get user's current plan limits
+   * Since subscription system was removed, all users have unlimited access
    */
   async getUserLimits(userId: string): Promise<PlanLimits> {
-    return subscriptionService.getUserLimits(userId);
+    return {
+      maxCards: -1, // unlimited
+      maxTransactions: -1, // unlimited
+      analytics: true,
+      export: true,
+      prioritySupport: true,
+      apiAccess: true,
+      teamManagement: true,
+      customIntegrations: true,
+    };
   }
 
   /**
    * Get user's current plan information
+   * Since subscription system was removed, all users have unlimited access
    */
   async getUserPlanInfo(userId: string) {
-    const subscription = await subscriptionService.getUserSubscription(userId);
-    if (!subscription) {
-      return null;
-    }
-
-    const plan = await subscriptionService.getPlan(subscription.planId);
     return {
-      subscription,
-      plan,
+      subscription: null,
+      plan: {
+        id: 'unlimited',
+        displayName: 'Unlimited Access',
+        tier: 'enterprise',
+        price: 0,
+        interval: 'forever',
+        description: 'Full access to all features - subscription system removed',
+        isActive: true,
+        limits: {
+          maxCards: -1,
+          maxTransactions: -1,
+          analytics: true,
+          export: true,
+          prioritySupport: true,
+          apiAccess: true,
+          teamManagement: true,
+          customIntegrations: true,
+        }
+      }
     };
   }
 
@@ -379,33 +318,18 @@ export function withSubscriptionCheck<P extends object>(
 ) {
   return function SubscriptionProtectedComponent(props: P) {
     const { user } = useAuth();
-    const { tier, subscription } = useSubscription();
     const [hasAccess, setHasAccess] = useState<boolean | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
       const checkAccess = async () => {
-        if (!requiredFeature) {
-          setHasAccess(true);
-          setLoading(false);
-          return;
-        }
-
-        if (!user) {
-          setHasAccess(false);
-          setLoading(false);
-          return;
-        }
-
-        // Check if the feature is available in the current subscription
-        const limits = subscription?.features || getDefaultLimits(tier);
-        const canAccess = !!limits[requiredFeature as keyof typeof limits];
-        setHasAccess(canAccess);
+        // Since subscription system was removed, all users have unlimited access
+        setHasAccess(true);
         setLoading(false);
       };
 
       checkAccess();
-    }, [user, tier, subscription]);
+    }, [user]);
 
     if (loading) {
       return <div>Loading...</div>; // Or your loading component
@@ -414,11 +338,10 @@ export function withSubscriptionCheck<P extends object>(
     if (!hasAccess) {
       return (
         <div className="p-6 text-center">
-          <h3 className="text-lg font-semibold mb-2">Upgrade Required</h3>
+          <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
           <p className="text-gray-600 mb-4">
-            This feature requires a higher subscription plan.
+            You don't have access to this feature.
           </p>
-          {/* Add upgrade button/component here */}
         </div>
       );
     }
