@@ -111,6 +111,11 @@ export function getFirebaseAuthError(error: FirebaseError | unknown): FriendlyEr
       message: 'This link is for a different user.',
       suggestion: 'Please make sure you\'re signed in with the correct account.'
     },
+    'auth/missing-email': {
+      title: 'Email Required',
+      message: 'Please enter your email address.',
+      suggestion: 'Enter your email address to receive a password reset link.'
+    },
 
     // Sign out errors
     'auth/insufficient-permission': {

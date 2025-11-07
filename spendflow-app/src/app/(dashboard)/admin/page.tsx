@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { AnnouncementsBanner } from '@/components/announcements/AnnouncementsBanner';
 import {
   collection,
   getCountFromServer,
@@ -36,6 +37,7 @@ interface AdminStats {
   totalCards: number;
   totalTransactions: number;
   totalTransactionValue: number;
+  totalBalance: number; // Total balance across all user cards
   totalMessages: number;
   newMessages: number;
   systemHealth: SystemHealthStatus;
@@ -56,6 +58,7 @@ export default function AdminPage() {
     totalCards: 0,
     totalTransactions: 0,
     totalTransactionValue: 0,
+    totalBalance: 0,
     totalMessages: 0,
     newMessages: 0,
     systemHealth: 'operational',
@@ -268,7 +271,53 @@ export default function AdminPage() {
         ),
 
         // 7. Total cards - safe query
-        safeGetCount('cards', true)
+        safeGetCount('cards', true),
+
+        // 8. Calculate total balance across all cards
+        (async () => {
+          try {
+            const cardsRef = collection(db, 'cards');
+            const cardsSnapshot = await getDocs(cardsRef);
+            let totalBalance = 0;
+            
+            cardsSnapshot.forEach((doc) => {
+              const card = doc.data();
+              // For credit cards: show available credit (limit - balance)
+              // For debit cards: show balance
+              if (card.type === 'credit') {
+                totalBalance += (card.limit || 0) - (card.balance || 0);
+              } else {
+                totalBalance += card.balance || 0;
+              }
+            });
+            
+            console.log('Total balance calculated:', totalBalance);
+            return totalBalance;
+          } catch (e) {
+            console.error('Error calculating total balance:', e);
+            return 0;
+          }
+        })(),
+
+        // 9. Calculate total transaction value
+        (async () => {
+          try {
+            const transactionsRef = collection(db, 'transactions');
+            const transactionsSnapshot = await getDocs(query(transactionsRef, limit(1000)));
+            let totalValue = 0;
+            
+            transactionsSnapshot.forEach((doc) => {
+              const transaction = doc.data();
+              totalValue += Math.abs(transaction.amount || 0);
+            });
+            
+            console.log('Total transaction value calculated:', totalValue);
+            return totalValue;
+          } catch (e) {
+            console.error('Error calculating transaction value:', e);
+            return 0;
+          }
+        })()
       ]);
 
       // Extract values from results with detailed error logging
@@ -297,10 +346,11 @@ export default function AdminPage() {
       const newUsers = extractResult(2, 'newUsers') as number;
       const transactionStats = extractResult(3, 'transactionStats') as { count: number; value: number };
       const totalTransactions = transactionStats?.count || 0;
-      const totalTransactionValue = transactionStats?.value || 0;
       const totalMessages = extractResult(4, 'totalMessages') as number;
       const newMessages = extractResult(5, 'newMessages') as number;
       const totalCards = extractResult(6, 'totalCards') as number;
+      const totalBalance = extractResult(7, 'totalBalance') as number;
+      const totalTransactionValue = extractResult(8, 'totalTransactionValue') as number;
 
       // Calculate storage usage (placeholder)
       const storageUsed = loadingTimeout ? 'Loading timeout - data unavailable' : 'Calculating...';
@@ -324,6 +374,7 @@ export default function AdminPage() {
         totalCards,
         totalTransactions,
         totalTransactionValue,
+        totalBalance,
         totalMessages,
         newMessages,
         systemHealth: loadingTimeout ? 'degraded' : (systemHealth ? 'operational' : 'degraded'),
@@ -453,36 +504,36 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Quick Actions */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-slate-100 mb-4">Quick Actions</h3>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Quick Actions</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <button
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => router.push('/dashboard')}
               >
-                <CreditCard className="h-6 w-6 mx-auto mb-2 text-amber-400" />
-                <span className="text-sm">My Transactions</span>
+                <span className="text-lg">💳</span>
+                <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>My Transactions</span>
               </button>
               <button
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => router.push('/login')}
               >
                 <MessageSquare className="h-6 w-6 mx-auto mb-2 text-purple-400" />
-                <span className="text-sm">Contact Support</span>
+                <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Contact Support</span>
               </button>
               <button
                 className="p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => router.push('/dashboard')}
               >
                 <SparklesIcon className="h-6 w-6 mx-auto mb-2 text-green-400" />
-                <span className="text-sm">Account Settings</span>
+                <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Account Settings</span>
               </button>
             </div>
           </div>
 
           {/* Recent Transactions Table */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-slate-100 mb-4">Recent Transactions</h3>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Recent Transactions</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-800">
                 <thead>
@@ -511,11 +562,11 @@ export default function AdminPage() {
 
         {/* Right Column - Recent Activity */}
         <div className="lg:col-span-1">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
             <div className="text-center py-8">
               <ShieldCheckIcon className="h-12 w-12 text-slate-600 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">Recent Activity</p>
-              <p className="text-xs text-slate-500 mt-1">Activity feed would be displayed here</p>
+              <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Recent Activity</p>
+              <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Activity feed would be displayed here</p>
             </div>
           </div>
         </div>
@@ -524,60 +575,76 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <ShieldCheckIcon className="h-6 w-6 text-amber-400" />
-            <h1 className="text-3xl font-serif text-slate-100 tracking-wide">
-              Admin Dashboard
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-amber-400 font-serif tracking-wide">ADMIN</span>
-          </div>
-        </div>
+    <div className="min-h-screen w-full bg-slate-950 text-slate-100">
+      <div className="fixed top-0 left-0 right-0 z-40">
+        <AnnouncementsBanner />
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">Total Users</p>
-                <p className="text-2xl font-bold text-slate-100">{stats.totalUsers}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-400" />
+      <div className="pt-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-serif mb-2 tracking-wide" style={{ color: 'var(--color-text-primary)' }}>
+                Admin Dashboard
+              </h1>
+              <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+                System overview and management tools
+              </p>
             </div>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+          <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">Total Cards</p>
-                <p className="text-2xl font-bold text-slate-100">{stats.totalCards}</p>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Total Cards</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{stats.totalCards}</p>
               </div>
-              <CreditCard className="h-8 w-8 text-amber-400" />
+              <span className="text-2xl">💳</span>
             </div>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+          <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">Transactions</p>
-                <p className="text-2xl font-bold text-slate-100">{stats.totalTransactions}</p>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Transactions</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{stats.totalTransactions}</p>
               </div>
-              <Database className="h-8 w-8 text-green-400" />
+              <Database className="h-8 w-8" style={{ color: 'var(--color-success)' }} />
             </div>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">Messages</p>
-                <p className="text-2xl font-bold text-slate-100">{stats.totalMessages}</p>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Messages</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{stats.totalMessages}</p>
                 {stats.newMessages > 0 && (
-                  <p className="text-xs text-red-400">{stats.newMessages} new</p>
+                  <p className="text-xs" style={{ color: 'var(--color-error)' }}>{stats.newMessages} new</p>
                 )}
               </div>
-              <MessageSquare className="h-8 w-8 text-purple-400" />
+              <MessageSquare className="h-8 w-8" style={{ color: 'var(--color-warning)' }} />
+            </div>
+          </div>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Total Balance (All Users)</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                  ${stats.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Available funds</p>
+              </div>
+              <Database className="h-8 w-8" style={{ color: 'var(--color-info)' }} />
+            </div>
+          </div>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Transaction Volume</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                  ${stats.totalTransactionValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Total processed</p>
+              </div>
+              <TagIcon className="h-8 w-8" style={{ color: 'var(--color-success)' }} />
             </div>
           </div>
         </div>
@@ -593,8 +660,8 @@ export default function AdminPage() {
                 <ShieldCheckIcon className="h-6 w-6 text-red-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">Admin Overview</h3>
-                <p className="text-sm text-slate-400">Real-time monitoring dashboard</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Admin Overview</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Real-time monitoring dashboard</p>
               </div>
             </div>
           </Link>
@@ -608,8 +675,8 @@ export default function AdminPage() {
                 <MessageSquare className="h-6 w-6 text-blue-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">Message Center</h3>
-                <p className="text-sm text-slate-400">Respond to user inquiries</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Message Center</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Respond to user inquiries</p>
               </div>
             </div>
           </Link>
@@ -623,8 +690,8 @@ export default function AdminPage() {
                 <Users className="h-6 w-6 text-blue-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">User Management</h3>
-                <p className="text-sm text-slate-400">Manage user accounts and permissions</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>User Management</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Manage user accounts and permissions</p>
               </div>
             </div>
           </Link>
@@ -635,11 +702,11 @@ export default function AdminPage() {
           >
             <div className="flex items-center gap-4">
               <div className="p-3 bg-amber-900/30 rounded-lg group-hover:bg-amber-900/50 transition-colors">
-                <CreditCard className="h-6 w-6 text-amber-400" />
+                <span className="text-lg">💳</span>
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">Recurring Payments</h3>
-                <p className="text-sm text-slate-400">Process automatic credit card payments</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Recurring Payments</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Process automatic credit card payments</p>
               </div>
             </div>
           </Link>
@@ -653,8 +720,8 @@ export default function AdminPage() {
                 <MessageSquare className="h-6 w-6 text-green-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">Messages</h3>
-                <p className="text-sm text-slate-400">View and manage user contact messages</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Messages</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>View and manage user contact messages</p>
               </div>
             </div>
           </Link>
@@ -668,8 +735,8 @@ export default function AdminPage() {
                 <SparklesIcon className="h-6 w-6 text-red-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">System Alerts</h3>
-                <p className="text-sm text-slate-400">Monitor and manage system alerts</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>System Alerts</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Monitor and manage system alerts</p>
               </div>
             </div>
           </Link>
@@ -683,8 +750,8 @@ export default function AdminPage() {
                 <SparklesIcon className="h-6 w-6 text-purple-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">Announcements</h3>
-                <p className="text-sm text-slate-400">Create and manage system announcements</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Announcements</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Create and manage system announcements</p>
               </div>
             </div>
           </Link>
@@ -698,17 +765,17 @@ export default function AdminPage() {
                 <Database className="h-6 w-6 text-slate-400" />
               </div>
               <div>
-                <h3 className="text-lg font-medium text-slate-100">Data Cleanup</h3>
-                <p className="text-sm text-slate-400">Database maintenance and cleanup tools</p>
+                <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>Data Cleanup</h3>
+                <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Database maintenance and cleanup tools</p>
               </div>
             </div>
           </Link>
         </div>
 
         {/* System Health */}
-        <div className="mt-8 bg-slate-900/50 border border-slate-800 rounded-lg p-6">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-slate-100">System Health</h3>
+            <h3 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>System Health</h3>
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 stats.systemHealth === 'operational'
@@ -721,7 +788,7 @@ export default function AdminPage() {
               </span>
             </div>
           </div>
-          <p className="text-slate-400 text-sm">
+          <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
             System is {stats.systemHealth}. Last updated: Just now.
           </p>
         </div>

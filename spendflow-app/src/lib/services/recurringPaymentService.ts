@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'fireb
 import { db } from '@/firebase/config';
 import { Card } from '@/types';
 import toast from 'react-hot-toast';
+import { alertsService } from '@/lib/alerts';
 
 export interface RecurringPaymentResult {
   success: boolean;
@@ -70,6 +71,22 @@ export class RecurringPaymentService {
       // Check if payment source is configured
       if (!creditCard.paymentDebitCardId) {
         result.error = 'No payment source configured';
+
+        // Create alert for user about missing payment source
+        try {
+          if (creditCard.userId) {
+            await alertsService.paymentFailed(
+              creditCard.userId,
+              creditCard.name || 'Unknown Card',
+              0,
+              'No payment source configured for automatic payments',
+              creditCard.id || ''
+            );
+          }
+        } catch (alertError) {
+          console.error('Failed to create payment failure alert:', alertError);
+        }
+
         return result;
       }
 
@@ -93,6 +110,22 @@ export class RecurringPaymentService {
       const availableBalance = debitCard.balance + (debitCard.overdraftLimit || 0);
       if (availableBalance < paymentAmount) {
         result.error = 'Insufficient funds in payment source';
+
+        // Create alert for user about failed payment
+        try {
+          if (creditCard.userId) {
+            await alertsService.paymentFailed(
+              creditCard.userId,
+              creditCard.name || 'Unknown Card',
+              paymentAmount,
+              'Insufficient funds in payment source account',
+              creditCard.id || ''
+            );
+          }
+        } catch (alertError) {
+          console.error('Failed to create payment failure alert:', alertError);
+        }
+
         return result;
       }
 
@@ -110,6 +143,18 @@ export class RecurringPaymentService {
 
       result.success = true;
       result.amount = paymentAmount;
+
+      // Create success alert for user
+      try {
+        await alertsService.paymentProcessed(
+          creditCard.userId,
+          creditCard.name || 'Unknown Card',
+          paymentAmount,
+          creditCard.id || ''
+        );
+      } catch (alertError) {
+        console.error('Failed to create payment success alert:', alertError);
+      }
 
       console.log(`Successfully processed payment of $${paymentAmount} from debit card ${debitCard.name} to credit card ${creditCard.name}`);
 
@@ -226,6 +271,98 @@ export class RecurringPaymentService {
       const userCreditCards = creditCards.filter(card => card.userId === userId);
 
       for (const creditCard of userCreditCards) {
+        if (!creditCard.paymentDebitCardId) continue;
+
+        const debitCard = await this.getCardById(creditCard.paymentDebitCardId);
+        if (!debitCard) continue;
+
+        const minimumPayment = creditCard.minimumPayment || Math.min(creditCard.balance * 0.03, 25);
+        const paymentAmount = Math.min(minimumPayment, creditCard.balance);
+
+        if (paymentAmount <= 0) continue;
+
+        // Calculate next due date
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        let dueDate = new Date(currentYear, currentMonth, creditCard.paymentDueDay || 15);
+
+        if (dueDate <= now) {
+          dueDate = new Date(currentYear, currentMonth + 1, creditCard.paymentDueDay || 15);
+        }
+
+        upcomingPayments.push({
+          creditCard,
+          debitCard,
+          amount: paymentAmount,
+          dueDate
+        });
+      }
+
+      return upcomingPayments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+    } catch (error) {
+      console.error('Error getting upcoming payments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check upcoming payments and send reminder alerts
+   */
+  static async sendPaymentReminders(): Promise<number> {
+    let reminderCount = 0;
+
+    try {
+      const upcomingPayments = await this.getUpcomingPaymentsWithoutUserFilter();
+
+      for (const payment of upcomingPayments) {
+        const daysUntilDue = Math.ceil((payment.dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+        // Send reminders for payments due in 1-7 days
+        if (daysUntilDue >= 1 && daysUntilDue <= 7) {
+          try {
+            await alertsService.paymentDueReminder(
+              payment.creditCard.userId,
+              payment.creditCard.name || 'Unknown Card',
+              payment.amount,
+              payment.dueDate,
+              daysUntilDue
+            );
+            reminderCount++;
+          } catch (alertError) {
+            console.error('Failed to create payment reminder alert:', alertError);
+          }
+        }
+      }
+
+      console.log(`Sent ${reminderCount} payment reminder alerts`);
+      return reminderCount;
+    } catch (error) {
+      console.error('Error sending payment reminders:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get upcoming payments for all users (internal method for reminders)
+   */
+  private static async getUpcomingPaymentsWithoutUserFilter(): Promise<Array<{
+    creditCard: Card;
+    debitCard: Card;
+    amount: number;
+    dueDate: Date;
+  }>> {
+    const upcomingPayments: Array<{
+      creditCard: Card;
+      debitCard: Card;
+      amount: number;
+      dueDate: Date;
+    }> = [];
+
+    try {
+      const creditCards = await this.getCreditCardsWithAutoPay();
+
+      for (const creditCard of creditCards) {
         if (!creditCard.paymentDebitCardId) continue;
 
         const debitCard = await this.getCardById(creditCard.paymentDebitCardId);

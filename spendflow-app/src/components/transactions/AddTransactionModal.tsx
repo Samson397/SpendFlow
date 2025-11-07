@@ -17,7 +17,7 @@ interface AddTransactionModalProps {
 }
 
 const categories = {
-  income: ['Salary', 'Freelance', 'Investment', 'Gift', 'Other'],
+  income: ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Gift', 'Other'],
   expense: ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'],
 };
 
@@ -84,12 +84,16 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
 
     try {
       const allCategories = await categoryService.getAllCategories(user.uid);
-      const incomeCategories = allCategories.filter(cat => cat.type === 'income').map(cat => cat.name);
-      const expenseCategories = allCategories.filter(cat => cat.type === 'expense').map(cat => cat.name);
+      const userIncomeCategories = allCategories.filter(cat => cat.type === 'income').map(cat => cat.name);
+      const userExpenseCategories = allCategories.filter(cat => cat.type === 'expense').map(cat => cat.name);
+
+      // Combine user categories with defaults (remove duplicates)
+      const combinedIncomeCategories = [...new Set([...userIncomeCategories, ...categories.income])];
+      const combinedExpenseCategories = [...new Set([...userExpenseCategories, ...categories.expense])];
 
       setAvailableCategories({
-        income: incomeCategories.length > 0 ? incomeCategories : categories.income,
-        expense: expenseCategories.length > 0 ? expenseCategories : categories.expense,
+        income: combinedIncomeCategories,
+        expense: combinedExpenseCategories,
       });
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -111,8 +115,14 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
       return;
     }
     
-    if (!formData.description.trim()) {
-      alert('Please enter a description or merchant name');
+    // Extract actual category value (handle custom categories)
+    let actualCategory = formData.category;
+    if (formData.category.startsWith('custom:')) {
+      actualCategory = formData.category.replace('custom:', '');
+    }
+
+    if (!actualCategory.trim()) {
+      alert('Please select a category or enter a custom category name');
       return;
     }
     
@@ -129,7 +139,7 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
         userId: user.uid,
         type: formData.type as 'income' | 'expense',
         amount: parseFloat(formData.amount),
-        category: formData.category,
+        category: actualCategory,
         description: formData.description,
         cardId: formData.cardId,
         date: new Date(formData.date),
@@ -284,15 +294,34 @@ export function AddTransactionModal({ isOpen, onClose, onSuccess, defaultType = 
             </label>
             <select
               required
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              value={formData.category.startsWith('custom:') ? 'custom' : formData.category || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'custom') {
+                  setFormData({ ...formData, category: 'custom:' });
+                } else {
+                  setFormData({ ...formData, category: value });
+                }
+              }}
               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
             >
               <option value="">Select category</option>
               {availableCategories[formData.type].map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
+              <option value="custom">✏️ Custom Category</option>
             </select>
+
+            {formData.category.startsWith('custom:') && (
+              <input
+                type="text"
+                required
+                placeholder="Enter custom category..."
+                value={formData.category.replace('custom:', '')}
+                onChange={(e) => setFormData({ ...formData, category: `custom:${e.target.value}` })}
+                className="w-full px-4 py-2 mt-2 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif text-sm"
+              />
+            )}
           </div>
 
           {/* Description */}

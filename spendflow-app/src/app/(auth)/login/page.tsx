@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { auth } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
-import { DeviceManagementService, PersistentAuthService } from '@/lib/services/deviceManagementService';
+import { DeviceManagementService } from '@/lib/services/deviceManagementService';
 import Image from 'next/image';
 
 function LoginContent() {
@@ -16,7 +16,6 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(false);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -34,6 +33,10 @@ function LoginContent() {
     setError('');
 
     try {
+      // Set persistence based on remember device preference
+      const persistence = rememberDevice ? browserLocalPersistence : browserSessionPersistence;
+      await setPersistence(auth, persistence);
+
       await signInWithEmailAndPassword(auth, email, password);
 
       // Check if user is admin and redirect accordingly
@@ -48,13 +51,6 @@ function LoginContent() {
         try {
           const deviceName = `${navigator.platform} ${navigator.userAgent.split(' ').pop()}`;
           await DeviceManagementService.registerDevice(currentUser.uid, deviceName, rememberDevice);
-          
-          if (rememberDevice) {
-            await PersistentAuthService.createPersistentSession(
-              currentUser.uid, 
-              await DeviceManagementService.generateDeviceId(await DeviceManagementService.generateDeviceFingerprint())
-            );
-          }
         } catch (error) {
           console.error('Error registering device:', error);
         }
@@ -74,6 +70,10 @@ function LoginContent() {
     setError('');
 
     try {
+      // Set persistence based on remember device preference
+      const persistence = rememberDevice ? browserLocalPersistence : browserSessionPersistence;
+      await setPersistence(auth, persistence);
+
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
@@ -87,38 +87,11 @@ function LoginContent() {
       try {
         const deviceName = `${navigator.platform} ${navigator.userAgent.split(' ').pop()}`;
         await DeviceManagementService.registerDevice(user.uid, deviceName, rememberDevice);
-        
-        if (rememberDevice) {
-          await PersistentAuthService.createPersistentSession(
-            user.uid, 
-            await DeviceManagementService.generateDeviceId(await DeviceManagementService.generateDeviceFingerprint())
-          );
-        }
       } catch (error) {
         console.error('Error registering device:', error);
       }
 
       router.replace(isAdmin ? '/admin' : '/dashboard');
-    } catch (error: unknown) {
-      const friendlyError = getFirebaseAuthError(error as { code?: string; message?: string });
-      setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Please enter your email address first');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setResetEmailSent(true);
     } catch (error: unknown) {
       const friendlyError = getFirebaseAuthError(error as { code?: string; message?: string });
       setError(`${friendlyError.title}: ${friendlyError.message}${friendlyError.suggestion ? ` ${friendlyError.suggestion}` : ''}`);
@@ -156,22 +129,6 @@ function LoginContent() {
             </Link>
           </p>
         </div>
-        
-        {/* Success Message */}
-        {resetEmailSent && (
-          <div className="bg-green-900/20 border border-green-700/30 p-4 backdrop-blur-sm">
-            <div className="flex">
-              <div className="shrink-0">
-                <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-green-300">Password reset email sent! Check your inbox.</p>
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Error Message */}
         {error && (
@@ -230,7 +187,7 @@ function LoginContent() {
                 id="email-address"
                 name="email"
                 type="email"
-                autoComplete="email"
+                autoComplete={rememberDevice ? "email" : "off"}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -247,7 +204,7 @@ function LoginContent() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={rememberDevice ? "current-password" : "off"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -272,13 +229,12 @@ function LoginContent() {
               </div>
 
               <div>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
+                <Link
+                  href="/forgot-password"
                   className="font-serif text-amber-400 hover:text-amber-300 tracking-wide"
                 >
                   Forgot password?
-                </button>
+                </Link>
               </div>
             </div>
 

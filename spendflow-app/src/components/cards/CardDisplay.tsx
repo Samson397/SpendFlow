@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card as CardType } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { getCardExpiryStatus } from '@/lib/utils/cardExpiry';
 import { CreditCard } from 'lucide-react';
 
@@ -11,6 +11,7 @@ interface CardDisplayProps {
 }
 
 export function CardDisplay({ card }: CardDisplayProps) {
+  const { formatAmount } = useCurrency();
   // Get last 4 digits from cardNumber or lastFour field
   const lastFour = card.lastFour || (card.cardNumber ? card.cardNumber.slice(-4) : '****');
   const cardNumberDisplay = `•••• •••• •••• ${lastFour}`;
@@ -108,15 +109,34 @@ export function CardDisplay({ card }: CardDisplayProps) {
         {/* Bottom section - Balance */}
         <div className="flex justify-between items-end">
           <div className="flex-1">
-            <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Balance</p>
-            <p className="font-bold text-sm sm:text-base md:text-lg lg:text-xl text-white">{formatCurrency(card.balance)}</p>
+            {card.type === 'credit' ? (
+              <>
+                <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Available Credit</p>
+                <p className="font-bold text-sm sm:text-base md:text-lg lg:text-xl text-white">
+                  {formatAmount((card.limit || 0) - card.balance)}
+                </p>
+                {card.limit && (
+                  <p className="text-xs text-white/70 mt-1">
+                    Used: {formatAmount(card.balance)} / {formatAmount(card.limit)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-white/90 uppercase tracking-widest font-medium">
+                  {card.balance < 0 ? 'Overdraft' : 'Balance'}
+                </p>
+                <p className={`font-bold text-sm sm:text-base md:text-lg lg:text-xl ${card.balance < 0 ? 'text-red-300' : 'text-white'}`}>
+                  {formatAmount(Math.abs(card.balance))}
+                </p>
+                {card.balance < 0 && card.overdraftLimit && (
+                  <p className="text-xs text-red-200 mt-1">
+                    Limit: {formatAmount(card.overdraftLimit)}
+                  </p>
+                )}
+              </>
+            )}
           </div>
-          {card.type === 'credit' && card.limit && (
-            <div className="text-right">
-              <p className="text-xs text-white/90 uppercase tracking-widest font-medium">Limit</p>
-              <p className="font-bold text-sm sm:text-base md:text-lg lg:text-xl text-white">{formatCurrency(card.limit)}</p>
-            </div>
-          )}
         </div>
       </div>
 

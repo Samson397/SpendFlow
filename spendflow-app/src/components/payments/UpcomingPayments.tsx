@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { RecurringPaymentService } from '@/lib/services/recurringPaymentService';
 import { Card } from '@/types';
 import toast from 'react-hot-toast';
@@ -15,6 +16,7 @@ interface UpcomingPayment {
 
 export function UpcomingPayments() {
   const { user } = useAuth();
+  const { formatAmount } = useCurrency();
   const [payments, setPayments] = useState<UpcomingPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function UpcomingPayments() {
       const result = await RecurringPaymentService.processPaymentForCard(creditCardId);
 
       if (result.success) {
-        toast.success(`Payment processed: $${result.amount}`);
+        toast.success(`Payment processed: ${formatAmount(result.amount)}`);
         await loadUpcomingPayments(); // Refresh the list
       } else {
         toast.error(result.error || 'Payment failed');
@@ -123,7 +125,7 @@ export function UpcomingPayments() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className="text-lg font-serif text-slate-100">${payment.amount.toFixed(2)}</div>
+                    <div className="text-lg font-serif text-slate-100">{formatAmount(payment.amount)}</div>
                     <div className="text-xs text-slate-500">Minimum payment</div>
                   </div>
                   <button

@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
     formats: ['image/webp', 'image/avif'], // Modern formats for smaller sizes
   },
 
-  // Use standalone output for web deployment
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // Use export for static site deployment
+  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
 
   typescript: {
     ignoreBuildErrors: true, // Allow builds to complete

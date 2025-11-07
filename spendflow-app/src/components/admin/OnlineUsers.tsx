@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { monitorAllUsersStatus } from '@/lib/firebase/presence';
 import { usersService } from '@/lib/firebase/firestore';
-import { UserIcon as User, Users, Circle } from 'lucide-react';
 import type { UserProfile } from '@/types';
 
 interface OnlineUser {
@@ -161,7 +160,7 @@ export default function OnlineUsers() {
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-2 mb-4">
-        <Users className="h-5 w-5 text-amber-400" />
+        <span className="text-lg">👥</span>
         <h3 className="text-lg font-medium">Online Users ({onlineCount})</h3>
       </div>
       
@@ -177,7 +176,7 @@ export default function OnlineUsers() {
               <div className="flex items-center space-x-3">
                 <div className="relative">
                   <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                    <User className="h-5 w-5 text-slate-300" />
+                    <span className="text-lg">👤</span>
                   </div>
                   <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-900 bg-green-500"></div>
                 </div>
@@ -187,7 +186,7 @@ export default function OnlineUsers() {
                 </div>
               </div>
               <div className="flex items-center space-x-1">
-                <Circle className="h-2 w-2 text-green-500" />
+                <span className="text-xs">🟢</span>
                 <span className="text-xs text-slate-400">Active</span>
               </div>
             </div>

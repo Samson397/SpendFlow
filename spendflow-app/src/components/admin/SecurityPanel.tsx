@@ -62,7 +62,7 @@ export default function SecurityPanel() {
     const fetchSecurityEvents = async () => {
       if (!user) {
         if (isMounted) setLoading(false);
-        return;
+        return () => {}; // Return empty cleanup function
       }
 
       try {
@@ -109,10 +109,11 @@ export default function SecurityPanel() {
           unsubscribe();
         };
       } catch (err) {
-        if (!isMounted) return;
+        if (!isMounted) return () => {}; // Return empty cleanup function
         console.error('Error setting up security events listener:', err);
         setError('Failed to set up security events listener');
         setLoading(false);
+        return () => {}; // Return empty cleanup function
       }
     };
 
@@ -142,32 +143,30 @@ export default function SecurityPanel() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return <Check className="h-4 w-4 text-green-500" aria-hidden={true} />;
+        return <span className="text-green-500">✓</span>;
       case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden={true} />;
+        return <span className="text-amber-500">⚠️</span>;
       case 'error':
-        return <X className="h-4 w-4 text-red-500" aria-hidden={true} />;
+        return <span className="text-red-500">✗</span>;
       default:
         return null;
     }
   };
 
   const getEventTypeIcon = (type: string) => {
-    const baseClass = 'h-4 w-4';
-    
     switch (type) {
       case 'login':
-        return <User className={`${baseClass} text-blue-500`} aria-hidden="true" />;
+        return <span className="text-blue-500">👤</span>;
       case 'failed_attempt':
-        return <X className={`${baseClass} text-red-500`} aria-hidden="true" />;
+        return <span className="text-red-500">✗</span>;
       case 'password_change':
-        return <Shield className={`${baseClass} text-purple-500`} aria-hidden="true" />;
+        return <span className="text-purple-500">🛡️</span>;
       case '2fa_enabled':
-        return <Shield className={`${baseClass} text-green-500`} aria-hidden="true" />;
+        return <span className="text-green-500">🛡️</span>;
       case 'suspicious_activity':
-        return <ShieldAlert className={`${baseClass} text-amber-500`} aria-hidden="true" />;
+        return <span className="text-amber-500">⚠️</span>;
       default:
-        return <Shield className={`${baseClass} text-slate-400`} aria-hidden="true" />;
+        return <span className="text-slate-400">🛡️</span>;
     }
   };
 
@@ -193,7 +192,7 @@ export default function SecurityPanel() {
     return (
       <div className="bg-red-900/20 border border-red-800/50 rounded-lg p-4 text-red-200">
         <div className="flex">
-          <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+          <span className="text-lg mr-2">⚠️</span>
           <p>{error}</p>
         </div>
       </div>
@@ -224,7 +223,7 @@ export default function SecurityPanel() {
               </div>
             </div>
             <div className="p-2 rounded-lg bg-slate-800/50">
-              <Shield className="h-5 w-5 text-amber-500" />
+              🛡️
             </div>
           </div>
           <p className="mt-3 text-xs text-slate-500">
@@ -256,7 +255,7 @@ export default function SecurityPanel() {
               </div>
             </div>
             <div className="p-2 rounded-lg bg-blue-900/20">
-              <User className="h-5 w-5 text-blue-400" />
+              <span className="text-lg">👤</span>
             </div>
           </div>
         </div>
@@ -277,7 +276,7 @@ export default function SecurityPanel() {
               </div>
             </div>
             <div className="p-2 rounded-lg bg-red-900/20">
-              <X className="h-5 w-5 text-red-400" />
+              <span className="text-lg">✗</span>
             </div>
           </div>
         </div>
@@ -303,7 +302,7 @@ export default function SecurityPanel() {
               </div>
             </div>
             <div className="p-2 rounded-lg bg-amber-900/20">
-              <ShieldAlert className="h-5 w-5 text-amber-400" />
+              <span className="text-lg">⚠️</span>
             </div>
           </div>
         </div>
@@ -323,7 +322,7 @@ export default function SecurityPanel() {
                     : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-500'
                 }`}
               >
-                <Shield className="h-4 w-4" />
+                <span className="text-sm">🛡️</span>
                 Overview
               </button>
               <button
@@ -334,7 +333,7 @@ export default function SecurityPanel() {
                     : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-500'
                 }`}
               >
-                <Activity className="h-4 w-4" />
+                <span className="text-sm">📊</span>
                 Activity Log
               </button>
               <button
@@ -345,7 +344,7 @@ export default function SecurityPanel() {
                     : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-500'
                 }`}
               >
-                <Settings className="h-4 w-4" />
+                <span className="text-sm">⚙️</span>
                 Settings
               </button>
             </nav>
@@ -361,7 +360,7 @@ export default function SecurityPanel() {
                     <div className="flex justify-between">
                       <div className="flex">
                         <div className="shrink-0">
-                          <ShieldAlert className="h-5 w-5 text-amber-400" />
+                          <span className="text-lg">⚠️</span>
                         </div>
                         <div className="ml-3">
                           <h3 className="text-sm font-medium text-amber-300">Suspicious Activity Detected</h3>
@@ -377,7 +376,7 @@ export default function SecurityPanel() {
                         className="text-amber-400 hover:text-amber-300 focus:outline-none"
                         aria-label="Dismiss"
                       >
-                        <X className="h-5 w-5" />
+                        <span className="text-lg">×</span>
                       </button>
                     </div>
                     <div className="mt-4">
@@ -496,7 +495,7 @@ export default function SecurityPanel() {
                             </p>
                           )}
                           <div className="mt-1 flex items-center text-xs text-slate-500">
-                            <Globe className="h-3 w-3 mr-1" />
+                            <span className="text-xs">🌍</span>
                             {event.ip || 'Unknown IP'} • {event.location || 'Unknown location'}
                           </div>
                         </div>
@@ -515,7 +514,7 @@ export default function SecurityPanel() {
                     <div className="flex items-start">
                       <div className="shrink-0 pt-0.5">
                         <div className="flex items-center justify-center h-6 w-6 rounded-full bg-green-900/30">
-                          <Check className="h-4 w-4 text-green-500" />
+                          <span className="text-lg">✅</span>
                         </div>
                       </div>
                       <div className="ml-3 flex-1">
@@ -535,7 +534,7 @@ export default function SecurityPanel() {
                       <div className="flex items-start">
                         <div className="shrink-0 pt-0.5">
                           <div className="flex items-center justify-center h-6 w-6 rounded-full bg-amber-900/30">
-                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            <span className="text-sm">⚠️</span>
                           </div>
                         </div>
                         <div className="ml-3 flex-1">
@@ -560,7 +559,7 @@ export default function SecurityPanel() {
                       <div className="flex items-start">
                         <div className="shrink-0 pt-0.5">
                           <div className="flex items-center justify-center h-6 w-6 rounded-full bg-red-900/30">
-                            <X className="h-4 w-4 text-red-500" />
+                            <span className="text-sm">×</span>
                           </div>
                         </div>
                         <div className="ml-3 flex-1">
@@ -692,7 +691,7 @@ export default function SecurityPanel() {
               <li className="flex items-start">
                 <div className="shrink-0">
                   <div className="flex items-center justify-center h-5 w-5 rounded-full bg-green-900/30">
-                    <Check className="h-3 w-3 text-green-500" />
+                    <span className="text-sm">✅</span>
                   </div>
                 </div>
                 <p className="ml-3 text-sm text-slate-300">
@@ -702,7 +701,7 @@ export default function SecurityPanel() {
               <li className="flex items-start">
                 <div className="shrink-0">
                   <div className="flex items-center justify-center h-5 w-5 rounded-full bg-blue-900/30">
-                    <Info className="h-3 w-3 text-blue-500" />
+                    <span className="text-sm">ℹ️</span>
                   </div>
                 </div>
                 <p className="ml-3 text-sm text-slate-300">
@@ -712,7 +711,7 @@ export default function SecurityPanel() {
               <li className="flex items-start">
                 <div className="shrink-0">
                   <div className="flex items-center justify-center h-5 w-5 rounded-full bg-amber-900/30">
-                    <AlertTriangle className="h-3 w-3 text-amber-500" />
+                    <span className="text-sm">⚠️</span>
                   </div>
                 </div>
                 <p className="ml-3 text-sm text-slate-300">
@@ -735,7 +734,7 @@ export default function SecurityPanel() {
                 className="text-slate-400 hover:text-slate-300"
                 onClick={() => setShow2FAModal(false)}
               >
-                <X className="h-5 w-5" />
+                <span className="text-lg">×</span>
               </button>
             </div>
             <div className="space-y-4">
@@ -792,7 +791,7 @@ export default function SecurityPanel() {
                 className="text-slate-400 hover:text-slate-300"
                 onClick={() => setShowPasswordPolicyModal(false)}
               >
-                <X className="h-5 w-5" />
+                <span className="text-lg">×</span>
               </button>
             </div>
             <div className="space-y-4">
@@ -898,7 +897,7 @@ export default function SecurityPanel() {
                 className="text-slate-400 hover:text-slate-300"
                 onClick={() => setShowIpWhitelistModal(false)}
               >
-                <X className="h-5 w-5" />
+                <span className="text-lg">×</span>
               </button>
             </div>
             <div className="space-y-4">
@@ -938,7 +937,7 @@ export default function SecurityPanel() {
                       type="button"
                       className="text-red-400 hover:text-red-300"
                     >
-                      <X className="h-4 w-4" />
+                      <span className="text-sm">×</span>
                     </button>
                   </div>
                   <div className="p-3 flex items-center justify-between">
@@ -950,7 +949,7 @@ export default function SecurityPanel() {
                       type="button"
                       className="text-red-400 hover:text-red-300"
                     >
-                      <X className="h-4 w-4" />
+                      <span className="text-sm">×</span>
                     </button>
                   </div>
                 </div>
@@ -991,7 +990,7 @@ function SecurityCheckItem({ title, description, status, onAction }: {
       <div className="shrink-0">
         {status === 'completed' ? (
           <div className="flex items-center justify-center h-6 w-6 rounded-full bg-green-900/30">
-            <Check className="h-4 w-4 text-green-500" />
+            <span className="text-lg">✅</span>
           </div>
         ) : status === 'in_progress' ? (
           <div className="flex items-center justify-center h-6 w-6 rounded-full bg-blue-900/30">

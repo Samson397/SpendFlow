@@ -1,0 +1,30 @@
+# SpendFlow - Robots.txt
+# Allow search engines to crawl public pages
+
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+
+# Disallow private/admin areas
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /profile/
+Disallow: /cards/
+Disallow: /transactions/
+Disallow: /expenses/
+Disallow: /income/
+Disallow: /savings/
+Disallow: /calendar/
+Disallow: /ai/
+Disallow: /categories/
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password
+Disallow: /verify-email
+
+# Sitemap location
+Sitemap: https://chat-76d96.web.app/sitemap.xml

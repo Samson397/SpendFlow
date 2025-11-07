@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { healthService, HealthCheckResult } from '@/lib/healthService';
-import { CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react';
 
 const StatusIcon = ({ status }: { status: string }) => {
   switch (status) {
     case 'operational':
-      return <CheckCircle className="h-5 w-5 text-green-500" />;
+      return <span className="text-lg">✅</span>;
     case 'degraded':
-      return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      return <span className="text-lg">⚠️</span>;
     case 'outage':
-      return <XCircle className="h-5 w-5 text-red-500" />;
+      return <span className="text-lg">❌</span>;
     default:
-      return <Clock className="h-5 w-5 text-gray-400" />;
+      return <span className="text-lg">⏰</span>;
   }
 };
 

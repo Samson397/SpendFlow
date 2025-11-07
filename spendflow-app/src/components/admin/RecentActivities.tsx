@@ -1,23 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity } from '@/types/activity';
 import { getRecentActivities, ActivityLogger, logActivity } from '@/lib/activityService';
 import { formatDistanceToNow } from 'date-fns';
-import { User, AlertCircle, CreditCard, Shield, PlusCircle, Activity as ActivityIcon } from 'lucide-react';
 import { db } from '@/firebase/config';
 import { collection, query, orderBy, limit, onSnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 
 const getActivityIcon = (type: string) => {
   switch (type) {
     case 'user':
-      return <User className="h-4 w-4 text-blue-500" />;
+      return <span className="text-sm">👤</span>;
     case 'security':
-      return <Shield className="h-4 w-4 text-red-500" />;
+      return <span className="text-sm">🛡️</span>;
     case 'transaction':
-      return <CreditCard className="h-4 w-4 text-amber-500" />;
+      return <span className="text-sm">💳</span>;
     default:
-      return <AlertCircle className="h-4 w-4 text-slate-400" />;
+      return <span className="text-sm">ℹ️</span>;
   }
 };
 
@@ -183,7 +182,7 @@ export default function RecentActivities() {
             className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
             title="Add test activity"
           >
-            <PlusCircle className="h-3.5 w-3.5" />
+            <span className="text-xs">+</span>
             Test
           </button>
         </div>
@@ -192,7 +191,7 @@ export default function RecentActivities() {
       {activities.length === 0 ? (
         <div className="text-center py-6 px-4 rounded-lg border-2 border-dashed border-slate-800 bg-slate-900/30">
           <div className="mx-auto h-10 w-10 text-slate-600 mb-2">
-            <ActivityIcon className="mx-auto h-8 w-8" />
+            <span className="text-4xl">📊</span>
           </div>
           <h4 className="text-sm font-medium text-slate-300">No recent activity</h4>
           <p className="text-xs text-slate-500 mt-1">
@@ -202,7 +201,7 @@ export default function RecentActivities() {
             onClick={addTestActivity}
             className="mt-3 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 mx-auto"
           >
-            <PlusCircle className="h-3.5 w-3.5" />
+            <span className="text-xs">+</span>
             Add test activity
           </button>
         </div>

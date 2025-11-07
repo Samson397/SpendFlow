@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, CheckCircle, XCircle, Clock, Filter, Search, Bell, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { alertsService, Alert } from '@/lib/alerts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -69,7 +68,7 @@ export default function AlertsPanel() {
       <div className="space-y-6">
         <div className="text-center py-12">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-900/20 mb-4">
-            <AlertTriangle className="h-6 w-6 text-red-400" />
+            <span className="text-lg">⚠️</span>
           </div>
           <h3 className="text-lg font-medium text-slate-300 mb-2">Admin Access Required</h3>
           <p className="text-slate-500 text-sm">
@@ -135,15 +134,15 @@ export default function AlertsPanel() {
   const getTypeIcon = (type: Alert['type']) => {
     switch (type) {
       case 'critical':
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <span className="text-lg">❌</span>;
       case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-amber-500" />;
+        return <span className="text-lg">⚠️</span>;
       case 'info':
-        return <AlertCircle className="h-5 w-5 text-blue-500" />;
+        return <span className="text-lg">ℹ️</span>;
       case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <span className="text-lg">✅</span>;
       default:
-        return <Bell className="h-5 w-5 text-slate-500" />;
+        return <span className="text-lg">🔔</span>;
     }
   };
 
@@ -231,7 +230,7 @@ export default function AlertsPanel() {
         {/* Search and Filter */}
         <div className="w-full sm:w-auto flex gap-2">
           <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
             <input
               type="text"
               placeholder="Search alerts..."
@@ -246,7 +245,7 @@ export default function AlertsPanel() {
               showFilters ? 'bg-slate-700' : 'bg-slate-800 hover:bg-slate-700 border border-slate-700'
             }`}
           >
-            <Filter className="h-4 w-4" />
+            <span className="text-sm">🔧</span>
             <span className="hidden sm:inline">Filters</span>
           </button>
           {alerts.length > 0 && (
@@ -340,7 +339,7 @@ export default function AlertsPanel() {
       <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
         {filteredAlerts.length === 0 ? (
           <div className="text-center py-12">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+            <span className="text-4xl">✅</span>
             <h3 className="text-lg font-medium text-slate-300">No alerts found</h3>
             <p className="text-slate-500 text-sm">All systems are running smoothly</p>
           </div>
@@ -362,7 +361,7 @@ export default function AlertsPanel() {
 
                       <div className="flex items-center space-x-4 text-xs text-slate-500">
                         <span className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
+                          <span className="text-xs">⏰</span>
                           {getTimeAgo(alert.createdAt instanceof Date ? alert.createdAt : new Date())}
                         </span>
                         <span className={`font-medium ${getPriorityColor(alert.priority)}`}>
@@ -416,7 +415,7 @@ export default function AlertsPanel() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
           <div className="flex items-center">
-            <XCircle className="h-8 w-8 text-red-500 mr-3" />
+            <span className="text-lg">❌</span>
             <div>
               <p className="text-2xl font-bold text-slate-100">
                 {alerts.filter(a => a.type === 'critical' && a.status === 'active').length}
@@ -428,7 +427,7 @@ export default function AlertsPanel() {
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
           <div className="flex items-center">
-            <AlertTriangle className="h-8 w-8 text-amber-500 mr-3" />
+            <span className="text-lg">⚠️</span>
             <div>
               <p className="text-2xl font-bold text-slate-100">
                 {alerts.filter(a => a.status === 'active').length}
@@ -440,7 +439,7 @@ export default function AlertsPanel() {
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
           <div className="flex items-center">
-            <CheckCircle className="h-8 w-8 text-green-500 mr-3" />
+            <span className="text-lg">✅</span>
             <div>
               <p className="text-2xl font-bold text-slate-100">
                 {alerts.filter(a => a.status === 'resolved').length}
@@ -452,7 +451,7 @@ export default function AlertsPanel() {
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
           <div className="flex items-center">
-            <Bell className="h-8 w-8 text-blue-500 mr-3" />
+            <span className="text-lg">🔔</span>
             <div>
               <p className="text-2xl font-bold text-slate-100">{alerts.length}</p>
               <p className="text-sm text-slate-400">Total Alerts</p>

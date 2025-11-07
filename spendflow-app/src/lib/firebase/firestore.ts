@@ -210,11 +210,14 @@ export const usersService = {
 // Cards service
 const cardsServiceBase = new FirestoreService<Card>('cards');
 export const cardsService = {
-  get: (id: string) => cardsServiceBase.get(id),
-  getAll: () => cardsServiceBase.getAll(),
-  create: (data: Omit<Card, 'id' | 'createdAt' | 'updatedAt'>) => cardsServiceBase.create(data),
-  update: (id: string, data: Partial<Omit<Card, 'id' | 'createdAt' | 'updatedAt'>>) => cardsServiceBase.update(id, data),
-  delete: (id: string) => cardsServiceBase.delete(id),
+  ...cardsServiceBase,
+  subscribe: cardsServiceBase.subscribe.bind(cardsServiceBase),
+  subscribeToDoc: cardsServiceBase.subscribeToDoc.bind(cardsServiceBase),
+  get: cardsServiceBase.get.bind(cardsServiceBase),
+  getAll: cardsServiceBase.getAll.bind(cardsServiceBase),
+  create: cardsServiceBase.create.bind(cardsServiceBase),
+  update: cardsServiceBase.update.bind(cardsServiceBase),
+  delete: cardsServiceBase.delete.bind(cardsServiceBase),
   
   async getByUserId(userId: string): Promise<Card[]> {
     const q = query(
@@ -243,11 +246,14 @@ export const cardsService = {
 // Transactions service
 const transactionsServiceBase = new FirestoreService<Transaction>('transactions');
 export const transactionsService = {
-  get: (id: string) => transactionsServiceBase.get(id),
-  getAll: () => transactionsServiceBase.getAll(),
-  create: (data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => transactionsServiceBase.create(data),
-  update: (id: string, data: Partial<Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>>) => transactionsServiceBase.update(id, data),
-  delete: (id: string) => transactionsServiceBase.delete(id),
+  ...transactionsServiceBase,
+  subscribe: transactionsServiceBase.subscribe.bind(transactionsServiceBase),
+  subscribeToDoc: transactionsServiceBase.subscribeToDoc.bind(transactionsServiceBase),
+  get: transactionsServiceBase.get.bind(transactionsServiceBase),
+  getAll: transactionsServiceBase.getAll.bind(transactionsServiceBase),
+  create: transactionsServiceBase.create.bind(transactionsServiceBase),
+  update: transactionsServiceBase.update.bind(transactionsServiceBase),
+  delete: transactionsServiceBase.delete.bind(transactionsServiceBase),
   
   async getByUserId(userId: string): Promise<Transaction[]> {
     const q = query(
@@ -381,8 +387,15 @@ export const incomeService = {
 };
 
 // Categories service
+const categoriesServiceBase = new FirestoreService<Category>('categories');
 export const categoriesService = {
-  ...new FirestoreService<Category>('categories'),
+  ...categoriesServiceBase,
+  subscribe: categoriesServiceBase.subscribe.bind(categoriesServiceBase),
+  subscribeToDoc: categoriesServiceBase.subscribeToDoc.bind(categoriesServiceBase),
+  get: categoriesServiceBase.get.bind(categoriesServiceBase),
+  create: categoriesServiceBase.create.bind(categoriesServiceBase),
+  update: categoriesServiceBase.update.bind(categoriesServiceBase),
+  delete: categoriesServiceBase.delete.bind(categoriesServiceBase),
   
   async getByType(type: 'expense' | 'income'): Promise<(Category & { id: string })[]> {
     const q = query(

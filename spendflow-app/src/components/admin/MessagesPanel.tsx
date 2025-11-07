@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, arrayUnion, serverTimestamp, addDoc, deleteDoc, limit, getDocs, where } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { format } from 'date-fns';
-import { Mail, Trash2, Archive, User, MailCheck, MailOpen } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export interface Reply {
@@ -429,7 +428,7 @@ export default function MessagesPanel() {
                     className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
                     title="Mark as read"
                   >
-                    <MailCheck className="h-4 w-4" />
+                    <span className="text-sm">✅</span>
                   </button>
                   <button
                     onClick={() => {
@@ -439,7 +438,7 @@ export default function MessagesPanel() {
                     className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
                     title="Archive"
                   >
-                    <Archive className="h-4 w-4" />
+                    <span className="text-sm">📁</span>
                   </button>
                   <button
                     onClick={() => {
@@ -451,7 +450,7 @@ export default function MessagesPanel() {
                     className="p-2 rounded-md hover:bg-red-900/50 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Delete selected messages"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <span className="text-sm">🗑️</span>
                   </button>
                 </div>
                 <div className="text-sm text-slate-400">
@@ -464,7 +463,7 @@ export default function MessagesPanel() {
             <div className="divide-y divide-slate-800 max-h-[600px] overflow-y-auto">
               {filteredMessages.length === 0 ? (
                 <div className="text-center py-12">
-                  <Mail className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+                  <span className="text-4xl">📧</span>
                   <h3 className="text-lg font-medium text-slate-300">No messages found</h3>
                   <p className="text-slate-500 mt-1">
                     {searchQuery 
@@ -539,7 +538,7 @@ export default function MessagesPanel() {
                             <div className={`shrink-0 h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center ${
                               message.type === 'received' && message.status === 'new' ? 'ring-2 ring-amber-500' : ''
                             }`}>
-                              <User className="h-5 w-5 text-amber-400" />
+                              <span className="text-sm">👤</span>
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-slate-200">
@@ -558,16 +557,16 @@ export default function MessagesPanel() {
                             }`}>
                               {message.type === 'received' ? (
                                 message.status === 'replied' ? (
-                                  <MailCheck className="h-4 w-4" />
+                                  <span className="text-sm">✅</span>
                                 ) : message.status === 'archived' ? (
-                                  <Archive className="h-4 w-4" />
+                                  <span className="text-sm">📁</span>
                                 ) : message.status === 'new' ? (
-                                  <Mail className="h-4 w-4" />
+                                  <span className="text-sm">📧</span>
                                 ) : (
-                                  <MailOpen className="h-4 w-4" />
+                                  <span className="text-sm">📬</span>
                                 )
                               ) : (
-                                <MailCheck className="h-4 w-4 text-green-400" />
+                                <span className="text-sm">✅</span>
                               )}
                             </span>
                             <div>
@@ -804,7 +803,7 @@ export default function MessagesPanel() {
                       >
                         <div className="flex items-center space-x-3">
                           <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center">
-                            <User className="h-4 w-4 text-amber-400" />
+                            <span className="text-sm">👤</span>
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-medium text-slate-200">

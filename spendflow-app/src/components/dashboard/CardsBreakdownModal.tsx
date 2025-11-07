@@ -1,6 +1,5 @@
 'use client';
 
-import { X, CreditCard } from 'lucide-react';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Card {
@@ -51,7 +50,7 @@ export function CardsBreakdownModal({ isOpen, onClose, cards, type }: CardsBreak
             onClick={onClose}
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
-            <X className="h-6 w-6" />
+            <span className="text-lg">×</span>
           </button>
         </div>
 
@@ -70,7 +69,7 @@ export function CardsBreakdownModal({ isOpen, onClose, cards, type }: CardsBreak
                         ? 'bg-blue-900/20 text-blue-400' 
                         : 'bg-green-900/20 text-green-400'
                     }`}>
-                      <CreditCard className="h-6 w-6" />
+                      <span className="text-2xl">💳</span>
                     </div>
                     <div>
                       <h3 className="text-lg font-serif text-slate-100 mb-1">
@@ -106,7 +105,7 @@ export function CardsBreakdownModal({ isOpen, onClose, cards, type }: CardsBreak
           ) : (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="h-8 w-8 text-slate-600" />
+                <span className="text-2xl">💳</span>
               </div>
               <p className="text-slate-400 font-serif">No {type} cards found</p>
               <p className="text-slate-600 text-sm mt-2">Add a card to get started</p>

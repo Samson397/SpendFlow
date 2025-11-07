@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Award, Shield, Heart, Target } from 'lucide-react';
 
 export default function AboutPage() {
   return (
@@ -77,7 +76,7 @@ export default function AboutPage() {
                 </p>
               </div>
               <div className="bg-gradient-to-br from-amber-900/20 via-slate-900/50 to-slate-900/20 border border-amber-700/30 p-12 rounded-lg">
-                <Target className="h-16 w-16 text-amber-400 mb-6" />
+                <span className="text-6xl">🎯</span>
                 <h3 className="text-2xl font-serif text-slate-100 mb-4">Our Vision</h3>
                 <p className="text-slate-400 leading-relaxed">
                   To become the most trusted and elegant financial management platform, empowering individuals to take control of their financial future with clarity and confidence.
@@ -100,7 +99,7 @@ export default function AboutPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-lg flex items-center justify-center mb-6">
-                  <Shield className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">🛡️</span>
                 </div>
                 <h3 className="text-xl font-serif text-slate-100 mb-3">Security First</h3>
                 <p className="text-slate-400 leading-relaxed">
@@ -110,7 +109,7 @@ export default function AboutPage() {
 
               <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-lg flex items-center justify-center mb-6">
-                  <Award className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">🏆</span>
                 </div>
                 <h3 className="text-xl font-serif text-slate-100 mb-3">Excellence</h3>
                 <p className="text-slate-400 leading-relaxed">
@@ -120,7 +119,7 @@ export default function AboutPage() {
 
               <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-lg flex items-center justify-center mb-6">
-                  <Heart className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">❤️</span>
                 </div>
                 <h3 className="text-xl font-serif text-slate-100 mb-3">User-Centric</h3>
                 <p className="text-slate-400 leading-relaxed">

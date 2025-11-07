@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { format } from 'date-fns';
-import { Mail, Check, Clock, Search, Filter, ChevronDown, ChevronUp, Trash2, Reply, Archive, Tag, MoreVertical } from 'lucide-react';
+import { Mail, Check, Clock, Search, Filter, ChevronDown, ChevronUp, Trash2, Archive, Tag, MoreVertical, Reply, Send, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export interface ContactMessage {
@@ -26,6 +26,9 @@ export default function ContactMessages() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   // Load messages from Firestore
   useEffect(() => {
@@ -92,18 +95,42 @@ export default function ContactMessages() {
     }
   };
 
-  // Update message status
-  const updateMessageStatus = async (id: string, status: string) => {
+  // Send reply to a user message
+  const sendReply = async (messageId: string, userId: string, userEmail: string, userName: string) => {
+    if (!replyText.trim()) return;
+
+    setSendingReply(true);
     try {
-      const messageRef = doc(db, 'contactMessages', id);
-      await updateDoc(messageRef, {
-        status,
+      // Create admin reply in messages collection
+      await addDoc(collection(db, 'messages'), {
+        from: 'admin',
+        to: userId,
+        subject: 'Admin Reply',
+        body: replyText.trim(),
+        read: false,
+        hasAttachment: false,
+        labels: ['admin-reply'],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        adminName: 'SpendFlow Support',
+        userId: userId
+      });
+
+      // Update original message status to replied
+      await updateDoc(doc(db, 'contactMessages', messageId), {
+        status: 'replied',
         updatedAt: new Date()
       });
-      toast.success(`Message marked as ${status}`);
+
+      // Reset reply state
+      setReplyingTo(null);
+      setReplyText('');
+      toast.success('Reply sent successfully!');
     } catch (error) {
-      console.error('Error updating message status:', error);
-      toast.error('Failed to update message status');
+      console.error('Error sending reply:', error);
+      toast.error('Failed to send reply');
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -162,6 +189,7 @@ export default function ContactMessages() {
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:min-w-[300px]">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
               <Search className="h-4 w-4 text-slate-500" />
             </div>
             <input
@@ -176,6 +204,7 @@ export default function ContactMessages() {
             onClick={() => setShowFilters(!showFilters)}
             className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
           >
+            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
             <Filter className="h-4 w-4" />
           </button>
         </div>
@@ -206,6 +235,7 @@ export default function ContactMessages() {
                   onClick={() => updateMultipleMessagesStatus('read')}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors flex items-center gap-1"
                 >
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Check className="h-3.5 w-3.5" />
                   <span>Mark as Read</span>
                 </button>
@@ -213,6 +243,7 @@ export default function ContactMessages() {
                   onClick={() => updateMultipleMessagesStatus('archived')}
                   className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-md transition-colors flex items-center gap-1"
                 >
+                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
                   <Archive className="h-3.5 w-3.5" />
                   <span>Archive</span>
                 </button>
@@ -226,6 +257,7 @@ export default function ContactMessages() {
       <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
         {filteredMessages.length === 0 ? (
           <div className="text-center py-12">
+            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
             <Mail className="h-12 w-12 text-slate-600 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-300">No messages found</h3>
             <p className="mt-1 text-sm text-slate-500">
@@ -252,34 +284,103 @@ export default function ContactMessages() {
 
             {/* Messages */}
             {filteredMessages.map((message) => (
-              <div 
-                key={message.id} 
-                className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-800/30 transition-colors ${
-                  message.status === 'new' ? 'bg-slate-800/20' : ''
-                }`}
-              >
-                <div className="col-span-1 flex items-center">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
-                    checked={selectedMessages.includes(message.id)}
-                    onChange={() => toggleSelectMessage(message.id)}
-                  />
+              <div key={message.id}>
+                <div 
+                  className={`grid grid-cols-12 gap-4 px-4 py-3 hover:bg-slate-800/30 transition-colors cursor-pointer ${
+                    message.status === 'new' ? 'bg-slate-800/20' : ''
+                  }`}
+                  onClick={() => setReplyingTo(replyingTo === message.id ? null : message.id)}
+                >
+                  <div className="col-span-1 flex items-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
+                      checked={selectedMessages.includes(message.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleSelectMessage(message.id);
+                      }}
+                    />
+                  </div>
+                  <div className="col-span-3 text-sm text-slate-300 truncate">
+                    <div className="font-medium">{message.userName}</div>
+                    <div className="text-xs text-slate-500">{message.userEmail}</div>
+                  </div>
+                  <div className="col-span-5">
+                    <div className="text-sm font-medium text-slate-200 truncate">{message.subject}</div>
+                    <div className="text-xs text-slate-500 truncate">{message.message.substring(0, 60)}...</div>
+                  </div>
+                  <div className="col-span-2 text-xs text-slate-400">
+                    {message.createdAt ? format(message.createdAt, 'MMM d, yyyy') : 'N/A'}
+                  </div>
+                  <div className="col-span-1 flex justify-end items-center gap-2">
+                    {getStatusBadge(message.status)}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReplyingTo(replyingTo === message.id ? null : message.id);
+                      }}
+                      className="p-1 text-slate-500 hover:text-amber-400 transition-colors"
+                      title="Reply to message"
+                    >
+                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
+                      <Reply className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="col-span-3 text-sm text-slate-300 truncate">
-                  <div className="font-medium">{message.userName}</div>
-                  <div className="text-xs text-slate-500">{message.userEmail}</div>
-                </div>
-                <div className="col-span-5">
-                  <div className="text-sm font-medium text-slate-200 truncate">{message.subject}</div>
-                  <div className="text-xs text-slate-500 truncate">{message.message.substring(0, 60)}...</div>
-                </div>
-                <div className="col-span-2 text-xs text-slate-400">
-                  {message.createdAt ? format(message.createdAt, 'MMM d, yyyy') : 'N/A'}
-                </div>
-                <div className="col-span-1 flex justify-end">
-                  {getStatusBadge(message.status)}
-                </div>
+
+                {/* Reply Section */}
+                {replyingTo === message.id && (
+                  <div className="px-4 py-4 bg-slate-800/20 border-t border-slate-700">
+                    <div className="mb-3">
+                      <h4 className="text-sm font-medium text-slate-300 mb-2">Reply to {message.userName}</h4>
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-md p-3 text-sm text-slate-400">
+                        <div className="font-medium text-slate-300 mb-1">{message.subject}</div>
+                        {message.message}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Type your reply..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm resize-none"
+                        rows={3}
+                        disabled={sendingReply}
+                      />
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => sendReply(message.id, message.userId, message.userEmail, message.userName)}
+                          disabled={!replyText.trim() || sendingReply}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
+                        >
+                          {sendingReply ? (
+                            <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
+                          ) : (
+                            <>
+                              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
+                              <Send className="h-3 w-3" />
+                              Send
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setReplyingTo(null);
+                            setReplyText('');
+                          }}
+                          disabled={sendingReply}
+                          className="px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-800 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
+                        >
+                          {/* @ts-expect-error Conflicting React types between lucide-react and project */}
+                          <X className="h-3 w-3" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

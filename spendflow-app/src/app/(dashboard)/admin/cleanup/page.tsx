@@ -80,13 +80,13 @@ export default function AdminCleanupPage() {
             </p>
             <div className="flex justify-center gap-4">
               <button
-                onClick={() => toast.info('Data cleanup functionality would be implemented here')}
+                onClick={() => toast('Data cleanup functionality would be implemented here', { icon: 'ℹ️' })}
                 className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Run Data Cleanup
               </button>
               <button
-                onClick={() => toast.info('Database backup functionality would be implemented here')}
+                onClick={() => toast('Database backup functionality would be implemented here', { icon: 'ℹ️' })}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Create Backup

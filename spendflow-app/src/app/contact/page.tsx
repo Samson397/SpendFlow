@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import ContactForm from '@/components/ContactForm';
-import { Mail, MessageSquare, Clock, Shield, ArrowLeft } from 'lucide-react';
 
 export default function ContactPage() {
   return (
@@ -69,7 +68,7 @@ export default function ContactPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-16">
               <div className="text-center">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">⏰</span>
                 </div>
                 <h3 className="text-lg font-serif text-slate-100 mb-2">24-48 Hours</h3>
                 <p className="text-slate-400 text-sm">Average response time</p>
@@ -77,7 +76,7 @@ export default function ContactPage() {
 
               <div className="text-center">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">🛡️</span>
                 </div>
                 <h3 className="text-lg font-serif text-slate-100 mb-2">Secure</h3>
                 <p className="text-slate-400 text-sm">Your data is protected</p>
@@ -85,7 +84,7 @@ export default function ContactPage() {
 
               <div className="text-center">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">💬</span>
                 </div>
                 <h3 className="text-lg font-serif text-slate-100 mb-2">Personal</h3>
                 <p className="text-slate-400 text-sm">Direct support from our team</p>
@@ -114,7 +113,7 @@ export default function ContactPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-lg flex items-center justify-center mb-6">
-                  <Mail className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">📧</span>
                 </div>
                 <h3 className="text-xl font-serif text-slate-100 mb-3">Email Support</h3>
                 <p className="text-slate-400 leading-relaxed mb-4">
@@ -130,7 +129,7 @@ export default function ContactPage() {
 
               <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
                 <div className="w-12 h-12 bg-amber-900/20 rounded-lg flex items-center justify-center mb-6">
-                  <MessageSquare className="h-6 w-6 text-amber-400" />
+                  <span className="text-2xl">💬</span>
                 </div>
                 <h3 className="text-xl font-serif text-slate-100 mb-3">Live Chat</h3>
                 <p className="text-slate-400 leading-relaxed mb-4">
@@ -151,7 +150,7 @@ export default function ContactPage() {
               href="/"
               className="inline-flex items-center gap-2 px-6 py-3 border border-slate-700 text-slate-300 hover:bg-slate-800/50 font-medium rounded-lg transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <span className="text-lg">←</span>
               Back to Home
             </Link>
           </div>

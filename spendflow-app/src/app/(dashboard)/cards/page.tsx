@@ -7,6 +7,7 @@ import { useAccessControl } from '@/lib/services/accessControlService';
 import { CardDisplay } from '@/components/cards/CardDisplay';
 import { Edit2, Trash2, Plus, Award } from 'lucide-react';
 import { AuthGate } from '@/components/auth/AuthGate';
+import { useCards } from '@/hooks/useCards';
 import { cardsService } from '@/lib/firebase/firestore';
 import { Card } from '@/types';
 import toast from 'react-hot-toast';
@@ -17,31 +18,26 @@ function CardsPageContent() {
   const { user } = useAuth();
   const { formatAmount } = useCurrency();
   const { canAddCard } = useAccessControl();
-  const [cards, setCards] = useState<Card[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Real-time data hook
+  const { cards, loading } = useCards(user?.uid);
+
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
 
-  useEffect(() => {
-    const loadCards = async () => {
-      if (user) {
-        try {
-          const userCards = await cardsService.getByUserId(user.uid);
-          setCards(userCards);
-        } catch (error) {
-          console.error('Error loading cards:', error);
-          toast.error('Unable to load your cards. Please refresh the page or try again later.');
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadCards();
-  }, [user]);
-
-  const totalBalance = cards.reduce((sum, card) => sum + card.balance, 0);
+  // Calculate total balance correctly:
+  // - Credit cards: available credit (limit - balance)
+  // - Debit cards: actual balance
+  const totalBalance = cards.reduce((sum, card) => {
+    if (card.type === 'credit') {
+      // For credit cards, show available credit
+      return sum + ((card.limit || 0) - card.balance);
+    } else {
+      // For debit cards, show actual balance
+      return sum + card.balance;
+    }
+  }, 0);
 
   if (loading) {
     return (
@@ -50,6 +46,17 @@ function CardsPageContent() {
       </div>
     );
   }
+
+  const handleAddSuccess = () => {
+    setShowModal(false);
+    // Data updates automatically through real-time hooks
+  };
+
+  const handleEditSuccess = () => {
+    setShowEditModal(false);
+    setSelectedCard(null);
+    // Data updates automatically through real-time hooks
+  };
 
   const handleAddCardClick = async () => {
     if (!user) return;
@@ -88,35 +95,6 @@ function CardsPageContent() {
     }
   };
 
-  const handleAddSuccess = async () => {
-    setShowModal(false);
-    // Refresh cards after adding - optimize by not awaiting
-    if (user) {
-      cardsService.getByUserId(user.uid).then(userCards => {
-        setCards(userCards);
-      }).catch(error => {
-        console.error('Error refreshing cards after add:', error);
-        // Fallback: reload page or show error
-        window.location.reload();
-      });
-    }
-  };
-
-  const handleEditSuccess = async () => {
-    setShowEditModal(false);
-    setSelectedCard(null);
-    // Refresh cards after editing - optimize by not awaiting
-    if (user) {
-      cardsService.getByUserId(user.uid).then(userCards => {
-        setCards(userCards);
-      }).catch(error => {
-        console.error('Error refreshing cards after edit:', error);
-        // Fallback: reload page or show error
-        window.location.reload();
-      });
-    }
-  };
-
   const handleEditClick = (card: Card) => {
     setSelectedCard(card);
     setShowEditModal(true);
@@ -127,7 +105,7 @@ function CardsPageContent() {
       try {
         if (user) {
           await cardsService.delete(cardId);
-          setCards(cards.filter(card => card.id !== cardId));
+          // Data will update automatically through real-time hooks
           toast.success('Card deleted successfully');
         }
       } catch (error) {
@@ -181,9 +159,14 @@ function CardsPageContent() {
       {/* Total Balance */}
       <div className="bg-linear-to-br from-amber-900/30 via-slate-900/60 to-slate-900/30 border border-amber-700/40 rounded-lg p-6 sm:p-8 md:p-10 lg:p-12 backdrop-blur-sm">
         <div className="text-center">
-          <div className="text-amber-400 text-xs tracking-widest uppercase mb-3 sm:mb-4 font-serif font-semibold">Total Balance</div>
+          <div className="text-amber-400 text-xs tracking-widest uppercase mb-3 sm:mb-4 font-serif font-semibold">Total Available Funds</div>
           <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-slate-100 mb-2 font-bold">{formatAmount(totalBalance)}</div>
-          <div className="text-slate-400 text-sm tracking-wider font-medium">Across {cards.length} Card{cards.length !== 1 ? 's' : ''}</div>
+          <div className="text-slate-400 text-sm tracking-wider font-medium">
+            Across {cards.length} Card{cards.length !== 1 ? 's' : ''}
+            <span className="block text-xs text-slate-500 mt-1">
+              (Credit: Available | Debit: Balance)
+            </span>
+          </div>
         </div>
       </div>
 

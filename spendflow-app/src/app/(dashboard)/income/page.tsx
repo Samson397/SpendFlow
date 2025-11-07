@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { TrendingUp, Plus, CreditCard } from 'lucide-react';
 import { transactionsService, cardsService } from '@/lib/firebase/firestore';
 import { Transaction } from '@/types';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
@@ -129,7 +128,7 @@ function IncomePageContent() {
           <div className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-md w-full p-6 sm:p-8 text-center">
             <div className="mb-6">
               <div className="w-16 h-16 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="h-8 w-8 text-amber-400" />
+                <span className="text-2xl">💳</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-serif text-slate-100 mb-2 tracking-wide">
                 No Cards Found
@@ -173,7 +172,7 @@ function IncomePageContent() {
           onClick={handleAddIncomeClick}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
         >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="text-lg">+</span>
           Add Income
         </button>
       </div>
@@ -184,7 +183,7 @@ function IncomePageContent() {
           <div className="text-amber-400/60 text-xs tracking-widest uppercase mb-3 sm:mb-4 font-serif">Total Income</div>
           <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-slate-100 mb-2">{formatAmount(totalIncome)}</div>
           <div className="flex items-center justify-center gap-2 text-slate-500">
-            <TrendingUp className="h-4 w-4" />
+            <span className="text-sm">📈</span>
             <span className="text-sm tracking-wider">{income.length} Transactions</span>
           </div>
         </div>

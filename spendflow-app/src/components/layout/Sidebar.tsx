@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon, CpuChipIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon, CpuChipIcon, BoltIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
@@ -26,7 +26,6 @@ const userNavigation: NavItem[] = [
   { name: 'Expenses', href: '/expenses', icon: CurrencyDollarIcon },
   { name: 'Income', href: '/income', icon: BanknotesIcon },
   { name: 'Cards', href: '/cards', icon: CreditCardIcon },
-  { name: 'Categories', href: '/categories', icon: TagIcon },
   { name: 'Savings', href: '/savings', icon: BuildingLibraryIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
   { name: 'AI Assistant', href: '/ai', icon: BoltIcon },
@@ -35,6 +34,7 @@ const userNavigation: NavItem[] = [
 
 const adminNavigation: NavItem[] = [
   { name: 'Admin Overview', href: '/admin/overview', icon: ShieldCheckIcon },
+  { name: 'Themes', href: '/admin/themes', icon: SparklesIcon },
   { name: 'Message Center', href: '/admin/messaging', icon: TagIcon },
   { name: 'User Management', href: '/admin/users', icon: UserIcon },
   { name: 'Recurring Payments', href: '/admin/recurring', icon: CreditCardIcon },
@@ -119,11 +119,12 @@ export default function Sidebar() {
           key={item.name}
           href={item.href}
           onClick={closeMobileMenu}
-          className={`group flex items-center px-4 py-4 text-sm transition-all duration-200 ${
-            isActive
-              ? 'border-l-2 border-(--theme-accent) bg-(--theme-secondary)/10 text-(--theme-accent)'
-              : 'border-l-2 border-transparent text-slate-400 hover:border-(--theme-accent)/50 hover:text-slate-200'
-          }`}
+          className={`group flex items-center px-4 py-4 text-sm transition-all duration-200 border-l-2 md:border-l-2 ${isActive ? 'border-l-2 border-(--theme-accent) bg-(--theme-secondary)/10 text-(--theme-accent)' : 'border-l-2 border-transparent text-slate-400 hover:border-(--theme-accent)/50 hover:text-slate-200'}`}
+          style={{
+            borderLeftColor: isActive ? 'var(--color-accent)' : undefined,
+            backgroundColor: isActive ? 'var(--color-background-secondary)' : undefined,
+            color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
+          }}
         >
           <item.icon
             className={`mr-3 shrink-0 h-5 w-5 transition-colors ${
@@ -136,6 +137,25 @@ export default function Sidebar() {
       );
     });
 
+    // Add currency selector and sign out after Profile
+    const currencyAndSignOut = [
+      <div key="currency-selector" className="px-4 py-3 border-t border-slate-700 mt-4 mb-2">
+        <div className="px-2">
+          <p className="text-xs text-slate-500 mb-2 font-serif tracking-wider">CURRENCY</p>
+          <CurrencySelector />
+        </div>
+      </div>,
+      <div key="sign-out-button" className="px-4 py-2">
+        <button
+          onClick={handleSignOut}
+          className="group flex w-full items-center px-4 py-3 text-sm text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-800/50"
+        >
+          <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-500 group-hover:text-slate-300" />
+          <span className="tracking-wide uppercase text-xs font-serif">Sign out</span>
+        </button>
+      </div>
+    ];
+
     // Show admin navigation only for admin users
     const adminLinks = isAdmin ? adminNavigation.map((item) => {
       const isActive = pathname === item.href;
@@ -144,11 +164,12 @@ export default function Sidebar() {
           key={item.name}
           href={item.href}
           onClick={closeMobileMenu}
-          className={`group flex items-center px-4 py-4 text-sm transition-all duration-200 ${
-            isActive
-              ? 'border-l-2 border-red-500 bg-red-900/10 text-red-400'
-              : 'border-l-2 border-transparent text-slate-500 hover:border-red-500/50 hover:text-slate-300'
-          }`}
+          className={`group flex items-center px-4 py-4 text-sm transition-all duration-200 border-l-2 ${isActive ? 'border-l-2 bg-red-900/10 text-red-400' : 'border-l-2 border-transparent text-slate-500 hover:border-red-500/50 hover:text-slate-300'}`}
+          style={{
+            borderLeftColor: isActive ? 'var(--color-error)' : undefined,
+            backgroundColor: isActive ? 'var(--color-background-tertiary)' : undefined,
+            color: isActive ? 'var(--color-error)' : 'var(--color-text-secondary)'
+          }}
         >
           <item.icon
             className={`mr-3 shrink-0 h-5 w-5 transition-colors ${
@@ -161,7 +182,8 @@ export default function Sidebar() {
       );
     }) : [];
 
-    return [...userLinks, ...adminLinks];
+    // Admins see ONLY admin pages, regular users see ONLY user pages
+    return isAdmin ? adminLinks : [...userLinks, currencyAndSignOut];
   };
 
   return (
@@ -183,30 +205,11 @@ export default function Sidebar() {
           <nav className="flex-1 overflow-y-auto py-2">
             {renderNavLinks()}
           </nav>
-          {/* Mobile Footer - Currency & Logout */}
-          <div className="border-t border-slate-800 p-4 space-y-4">
-            {/* Currency Selector */}
-            <div>
-              <p className="text-xs text-slate-500 mb-2 font-serif tracking-wider">CURRENCY</p>
-              <CurrencySelector />
-            </div>
-            {/* Sign Out Button */}
-            <button
-              onClick={() => {
-                handleSignOut();
-                closeMobileMenu();
-              }}
-              className="group flex w-full items-center px-4 py-4 text-sm text-slate-400 hover:text-slate-200 transition-colors border-t border-slate-700 pt-4"
-            >
-              <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-500 group-hover:text-slate-300" />
-              <span className="tracking-wide uppercase text-xs font-serif">Sign out</span>
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-amber-900/30">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 backdrop-blur-sm border-b" style={{ backgroundColor: 'var(--color-background)', borderColor: 'var(--color-accent)' }}>
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
             <Image
@@ -235,9 +238,9 @@ export default function Sidebar() {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:flex md:shrink-0">
-        <div className="flex flex-col w-64 border-r border-slate-800 bg-slate-900/50">
+        <div className="flex flex-col w-64 border-r" style={{ backgroundColor: 'var(--color-background-secondary)', borderColor: 'var(--color-border)' }}>
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex flex-col items-center justify-center h-24 shrink-0 px-4 bg-linear-to-r from-slate-800/50 to-slate-900/50">
+            <div className="flex flex-col items-center justify-center h-24 shrink-0 px-4" style={{ backgroundColor: 'var(--color-background-tertiary)' }}>
               <Image
                 src="/logo-128.png"
                 alt="SpendFlow Logo"
@@ -247,27 +250,10 @@ export default function Sidebar() {
               />
               <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-(--theme-accent) to-transparent mt-3"></div>
             </div>
-            <div className="flex flex-col grow mt-5">
-              <nav className="flex-1 px-2 space-y-1">
+            <div className="flex flex-col grow overflow-hidden">
+              <nav className="overflow-y-auto px-2 space-y-1 py-2">
                 {renderNavLinks()}
               </nav>
-            </div>
-            <div className="shrink-0 p-4 border-t border-slate-600 space-y-3">
-              {/* Currency Selector */}
-              <div className="px-2 py-3">
-                <p className="text-xs text-slate-500 mb-2 font-serif tracking-wider">CURRENCY</p>
-                <div className="mb-4">
-                  <CurrencySelector />
-                </div>
-              </div>
-              {/* Sign Out Button */}
-              <button
-                onClick={handleSignOut}
-                className="group flex w-full items-center px-4 py-4 text-sm text-slate-400 hover:text-slate-200 transition-colors"
-              >
-                <ArrowLeftOnRectangleIcon className="mr-3 h-5 w-5 text-slate-500 group-hover:text-slate-300" />
-                <span className="tracking-wide uppercase text-xs font-serif">Sign out</span>
-              </button>
             </div>
           </div>
         </div>

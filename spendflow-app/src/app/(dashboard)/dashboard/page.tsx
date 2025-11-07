@@ -1,36 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { Plus, Award } from 'lucide-react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/firebase/config';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
 import { AuthGate } from '@/components/auth/AuthGate';
-import { savingsAccountsService } from '@/lib/services/savingsService';
-import { DashboardAnalytics } from '@/components/dashboard/DashboardAnalytics';
-
-type Transaction = {
-  id: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category: string;
-  date: Date | { toDate: () => Date };
-  description: string;
-};
-
-type CardType = {
-  id: string;
-  name?: string;
-  type: 'credit' | 'debit';
-  balance: number;
-  lastFour?: string;
-  cardHolder?: string;
-};
+import { useTransactions } from '@/hooks/useTransactions';
+import { useCards } from '@/hooks/useCards';
 
 function DashboardContent() {
   const { user } = useAuth();
@@ -38,117 +17,91 @@ function DashboardContent() {
   const { formatAmount } = useCurrency();
   const { tier } = useSubscription();
 
+  // Real-time data hooks
+  const { transactions, loading: transactionsLoading } = useTransactions(user?.uid, { limit: 50 });
+  const { cards, loading: cardsLoading } = useCards(user?.uid);
+
   // Check if user is admin
   const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
   const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [cards, setCards] = useState<CardType[]>([]);
-  const [savingsAccounts, setSavingsAccounts] = useState<Array<{ id: string; balance: number; name: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
   const [selectedCardType, setSelectedCardType] = useState<'credit' | 'debit'>('credit');
-  const [analyticsKey, setAnalyticsKey] = useState(0); // Force analytics re-render
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [savingsAccounts] = useState<Array<{ id: string; balance: number; name: string }>>([]);
 
   const hasCards = cards.length > 0;
-  const [stats, setStats] = useState({
-    totalBalance: 0,
-    creditBalance: 0,
-    debitBalance: 0,
-    creditCardCount: 0,
-    debitCardCount: 0,
-    income: 0,
-    expenses: 0,
-    savings: 0,
-  });
+  const loading = transactionsLoading || cardsLoading;
 
-  // Check subscription limits and show warnings
-  const checkSubscriptionLimits = useCallback(async () => {
-    // No restrictions - always allow
-  }, []);
+  // Calculate upcoming expenses for next 2-3 days
+  const upcomingExpenses = useMemo(() => {
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(now.getDate() + 3);
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    
-    try {
-      // Fetch transactions
-      const transactionsQuery = query(
-        collection(db, 'transactions'),
-        where('userId', '==', user.uid)
-      );
-      
-      const transactionsSnapshot = await getDocs(transactionsQuery);
-      const transactionsData = transactionsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Transaction[];
-      
-      setTransactions(transactionsData.slice(0, 3));
+    return transactions
+      .filter(t => {
+        if (t.type !== 'expense') return false;
+        const transactionDate = new Date(t.date);
+        return transactionDate >= now && transactionDate <= threeDaysFromNow;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5); // Show up to 5 upcoming expenses
+  }, [transactions]);
 
-      // Calculate stats
-      const income = transactionsData
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0);
-        
-      const expenses = transactionsData
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0);
+  // Calculate stats reactively from real-time data
+  const stats = useMemo(() => {
+    // Calculate card balances (BANK LOGIC)
+    const creditCards = cards.filter(card => card.type === 'credit');
+    const debitCards = cards.filter(card => card.type === 'debit');
 
-      // Fetch cards
-      const cardsQuery = query(collection(db, 'cards'), where('userId', '==', user.uid));
-      const cardsSnapshot = await getDocs(cardsQuery);
-      const cardsData = cardsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as CardType[];
-      
-      setCards(cardsData);
-      
-      // Calculate card balances
-      const creditCards = cardsData.filter(card => card.type === 'credit');
-      const debitCards = cardsData.filter(card => card.type === 'debit');
-      
-      const creditBalance = creditCards.reduce((sum, card) => sum + card.balance, 0);
-      const debitBalance = debitCards.reduce((sum, card) => sum + card.balance, 0);
-      
-      // Total balance = all available money (both debit and credit available)
-      const totalBalance = debitBalance + creditBalance;
+    // Credit cards: show available credit (limit - balance)
+    const creditBalance = creditCards.reduce((sum, card) => {
+      return sum + ((card.limit || 0) - card.balance);
+    }, 0);
 
-      // Fetch savings accounts
-      const savingsData = await savingsAccountsService.getUserAccounts(user.uid);
-      setSavingsAccounts(savingsData);
+    // Debit cards: show actual balance
+    const debitBalance = debitCards.reduce((sum, card) => sum + card.balance, 0);
 
-      // Calculate total savings balance
-      const totalSavingsBalance = savingsData.reduce((sum, account) => sum + account.balance, 0);
-      
-      setStats({
-        totalBalance,
-        creditBalance,
-        debitBalance,
-        creditCardCount: creditCards.length,
-        debitCardCount: debitCards.length,
-        income,
-        expenses,
-        savings: totalSavingsBalance, // Now shows actual savings account balance
-      });
+    // Total available funds
+    const totalBalance = debitBalance + creditBalance;
 
-      // Check subscription limits
-      await checkSubscriptionLimits();
+    // Calculate income/expenses from all transactions (not just recent ones)
+    const income = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
+    const expenses = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate total savings balance
+    const totalSavingsBalance = savingsAccounts.reduce((sum, account) => sum + account.balance, 0);
+
+    return {
+      totalBalance,
+      creditBalance,
+      debitBalance,
+      creditCardCount: creditCards.length,
+      debitCardCount: debitCards.length,
+      income,
+      expenses,
+      savings: totalSavingsBalance,
+    };
+  }, [cards, transactions, savingsAccounts]);
+
+  const handleAddTransactionClick = async () => {
+    if (!hasCards) {
+      router.push('/cards');
+      return;
     }
-  }, [user, checkSubscriptionLimits]);
+    setShowTransactionModal(true);
+  };
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user, fetchData]);
+  const handleTransactionSuccess = () => {
+    setShowTransactionModal(false);
+    // Could add refresh logic here if needed
+  };
 
   if (loading) {
     return (
@@ -158,26 +111,298 @@ function DashboardContent() {
     );
   }
 
-  const handleTransactionSuccess = () => {
-    fetchData();
-    setAnalyticsKey(prev => prev + 1); // Force analytics refresh
-  };
-
-  const handleAddTransactionClick = async () => {
-    if (!hasCards) {
-      setShowNoCardsMessage(true);
-      setTimeout(() => {
-        router.push('/cards');
-      }, 2000);
-      return;
-    }
-
-    // No subscription restrictions - always allow
-    setShowTransactionModal(true);
-  };
-
   return (
-    <div className="space-y-12">
+    <>
+      <div className="space-y-12">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif mb-2 tracking-wide" style={{ color: 'var(--color-text-primary)' }}>
+              D A S H B O A R D
+            </h1>
+            <p className="text-sm tracking-widest uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Financial Overview</p>
+          </div>
+          <button
+            onClick={handleAddTransactionClick}
+            className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 border transition-colors tracking-wider uppercase text-sm w-full sm:w-auto justify-center"
+            style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}
+          >
+            <span className="text-lg">+</span>
+            <span className="hidden xs:inline">Add Transaction</span>
+            <span className="xs:hidden">Add</span>
+          </button>
+        </div>
+
+        {/* Welcome Message */}
+        <div className="text-center py-12">
+          <p className="text-lg font-serif italic mb-4 max-w-2xl mx-auto" style={{ color: 'var(--color-text-secondary)' }}>
+            Welcome to SpendFlow - Your financial dashboard is ready!
+          </p>
+          <div className="text-sm tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
+            — All features unlocked
+          </div>
+        </div>
+
+        {/* Card Balance Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
+          <button
+            onClick={() => {
+              setSelectedCardType('credit');
+              setShowCardsModal(true);
+            }}
+            className="p-6 sm:p-8 backdrop-blur-sm hover:border-blue-600/50 transition-colors text-left relative"
+            style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-2xl">💳</div>
+              <div className="text-right">
+                <div className="text-xs tracking-widest uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Credit Cards</div>
+                <div className="text-lg font-bold" style={{ color: 'var(--color-accent)' }}>{stats.creditCardCount}</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-3xl sm:text-4xl lg:text-5xl font-serif break-all overflow-hidden text-ellipsis max-w-full" style={{ color: 'var(--color-text-primary)' }}>
+                {formatAmount(stats.creditBalance)}
+              </div>
+              <div className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Available Credit</div>
+            </div>
+            <div className="absolute bottom-4 right-4 text-xs opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>
+              Tap to view modal →
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setSelectedCardType('debit');
+              setShowCardsModal(true);
+            }}
+            className="p-6 sm:p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left relative"
+            style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-2xl">💰</div>
+              <div className="text-right">
+                <div className="text-xs tracking-widest uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Debit Cards</div>
+                <div className="text-lg font-bold" style={{ color: 'var(--color-success)' }}>{stats.debitCardCount}</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-3xl sm:text-4xl lg:text-5xl font-serif break-all overflow-hidden text-ellipsis max-w-full" style={{ color: 'var(--color-text-primary)' }}>
+                {formatAmount(stats.debitBalance)}
+              </div>
+              <div className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Available Balance</div>
+            </div>
+            <div className="absolute bottom-4 right-4 text-xs opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>
+              Tap to view modal →
+            </div>
+          </button>
+        </div>
+
+        {/* Income/Expenses Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
+          <button
+            onClick={() => router.push('/income')}
+            className="p-4 sm:p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
+            style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+          >
+            <div className="border-l-2 pl-4 sm:pl-6" style={{ borderColor: 'var(--color-success)' }}>
+              <div className="text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif" style={{ color: 'var(--color-text-tertiary)' }}>Income</div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif mb-2 break-all overflow-hidden text-ellipsis max-w-full" style={{ color: 'var(--color-text-primary)' }}>
+                {formatAmount(stats.income)}
+              </div>
+              <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Total Revenue</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => router.push('/expenses')}
+            className="p-4 sm:p-8 backdrop-blur-sm hover:border-red-600/50 transition-colors text-left"
+            style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+          >
+            <div className="border-l-2 pl-4 sm:pl-6" style={{ borderColor: 'var(--color-error)' }}>
+              <div className="text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif" style={{ color: 'var(--color-text-tertiary)' }}>Expenses</div>
+              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif mb-2 break-all overflow-hidden text-ellipsis max-w-full" style={{ color: 'var(--color-text-primary)' }}>
+                {formatAmount(stats.expenses)}
+              </div>
+              <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Total Expenditure</div>
+            </div>
+          </button>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-12">
+          <h2 className="text-xl font-serif mb-6" style={{ color: 'var(--color-text-primary)' }}>Quick Actions</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <button
+              className="p-4 backdrop-blur-sm hover:bg-slate-900/50 transition-colors text-center"
+              style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+              onClick={() => router.push('/cards')}
+            >
+              <div className="text-2xl mb-2" style={{ color: 'var(--color-accent)' }}>💳</div>
+              <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>My Cards</span>
+            </button>
+            <button
+              className="p-4 backdrop-blur-sm hover:bg-slate-900/50 transition-colors text-center"
+              style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+              onClick={() => router.push('/transactions')}
+            >
+              <div className="text-2xl mb-2" style={{ color: 'var(--color-success)' }}>📊</div>
+              <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Transactions</span>
+            </button>
+            <button
+              className="p-4 backdrop-blur-sm hover:bg-slate-900/50 transition-colors text-center"
+              style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+              onClick={() => router.push('/savings')}
+            >
+              <div className="text-2xl mb-2" style={{ color: 'var(--color-warning)' }}>💰</div>
+              <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Savings</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Upcoming Expenses */}
+        <div className="mb-12">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-0.5" style={{ backgroundColor: 'var(--color-accent)' }}></div>
+            <h2 className="text-2xl font-serif" style={{ color: 'var(--color-text-primary)' }}>Upcoming Expenses</h2>
+          </div>
+
+          <div className="backdrop-blur-sm p-6" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            {upcomingExpenses.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingExpenses.map((expense) => {
+                  const expenseDate = new Date(expense.date);
+                  const today = new Date();
+                  const daysDiff = Math.ceil((expenseDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  const dayText = daysDiff === 0 ? 'Today' : daysDiff === 1 ? 'Tomorrow' : `In ${daysDiff} days`;
+
+                  return (
+                    <div key={expense.id} className="flex items-center justify-between py-3 border-b border-slate-700 last:border-b-0">
+                      <div className="flex items-center gap-4">
+                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                        <div>
+                          <div className="font-serif text-sm" style={{ color: 'var(--color-text-primary)' }}>{expense.description}</div>
+                          <div className="text-xs tracking-wider uppercase" style={{ color: 'var(--color-text-tertiary)' }}>
+                            {expense.category} • {dayText}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="font-serif text-lg" style={{ color: 'var(--color-accent)' }}>
+                        -{formatAmount(expense.amount)}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="pt-4 border-t border-slate-700">
+                  <button
+                    onClick={() => router.push('/expenses')}
+                    className="w-full text-center py-3 text-sm tracking-wider uppercase hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--color-accent)' }}
+                  >
+                    View All Expenses →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="text-2xl">📅</div>
+                </div>
+                <p className="text-slate-400 font-serif">No upcoming expenses</p>
+                <p className="text-slate-600 text-sm mt-2">Expenses scheduled for the next 3 days will appear here</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Portfolio Section */}
+        <div className="mb-12">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-0.5" style={{ backgroundColor: 'var(--color-accent)' }}></div>
+            <h2 className="text-2xl font-serif" style={{ color: 'var(--color-text-primary)' }}>Portfolio Overview</h2>
+          </div>
+
+          <div className="backdrop-blur-sm" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-x" style={{ borderColor: 'var(--color-border)' }}>
+              <button
+                onClick={() => router.push('/cards')}
+                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
+              >
+                <div className="text-3xl mb-2">💳</div>
+                <div className="text-2xl sm:text-3xl font-serif mb-2" style={{ color: 'var(--color-text-primary)' }}>{cards.length}</div>
+                <div className="text-sm tracking-widest uppercase" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {cards.length === 1 ? 'Account' : 'Accounts'}
+                </div>
+              </button>
+              <button
+                onClick={() => router.push('/savings')}
+                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
+              >
+                <div className="text-3xl mb-2">🏦</div>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-serif mb-2 break-all overflow-hidden text-ellipsis max-w-full" style={{ color: 'var(--color-text-primary)' }}>
+                  {formatAmount(stats.savings)}
+                </div>
+                <div className="text-sm tracking-widest uppercase" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {savingsAccounts.length} {savingsAccounts.length === 1 ? 'Account' : 'Accounts'}
+                </div>
+              </button>
+              <button
+                onClick={() => router.push('/transactions')}
+                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
+              >
+                <div className="text-3xl mb-2">📈</div>
+                <div className="text-2xl sm:text-3xl font-serif mb-2" style={{ color: 'var(--color-text-primary)' }}>{transactions.length}</div>
+                <div className="text-sm tracking-widest uppercase" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {transactions.length === 1 ? 'Transaction' : 'Transactions'}
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-0.5" style={{ backgroundColor: 'var(--color-accent)' }}></div>
+              <h2 className="text-2xl font-serif" style={{ color: 'var(--color-text-primary)' }}>Recent Activity</h2>
+            </div>
+            <button
+              onClick={() => router.push('/transactions')}
+              className="text-sm tracking-wider uppercase hover:opacity-80 transition-opacity"
+              style={{ color: 'var(--color-accent)' }}
+            >
+              View All →
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            {transactions.slice(0, 3).length > 0 ? (
+              transactions.slice(0, 3).map((transaction) => (
+                <div key={transaction.id} className="py-6 hover:bg-slate-900/30 transition-colors" style={{ borderBottomColor: 'var(--color-border)' }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="w-1 h-12" style={{ backgroundColor: transaction.type === 'income' ? 'var(--color-success)' : 'var(--color-accent)' }}></div>
+                      <div>
+                        <div className="font-serif mb-1" style={{ color: 'var(--color-text-primary)' }}>{transaction.description}</div>
+                        <div className="text-xs tracking-wider uppercase" style={{ color: 'var(--color-text-tertiary)' }}>{transaction.category}</div>
+                      </div>
+                    </div>
+                    <div className="font-serif text-lg sm:text-xl break-all max-w-full" style={{ color: transaction.type === 'income' ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+                      {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12 font-serif" style={{ color: 'var(--color-text-tertiary)' }}>
+                No recent transactions
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Add Transaction Modal */}
       <AddTransactionModal
         isOpen={showTransactionModal}
@@ -192,239 +417,10 @@ function DashboardContent() {
         cards={cards}
         type={selectedCardType}
       />
-
-      {/* No Cards Message */}
-      {showNoCardsMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-amber-700/30 rounded-lg p-8 max-w-md mx-4 text-center">
-            <div className="mb-6">
-              <div className="w-16 h-16 bg-amber-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                <Plus className="h-8 w-8 text-amber-400" />
-              </div>
-              <h3 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">No Cards Found</h3>
-              <p className="text-slate-400 text-sm">
-                You need to add a payment card before creating transactions.
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-2 text-amber-400">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-amber-400 border-t-transparent"></div>
-              <span className="text-sm tracking-wider">Redirecting to Cards page...</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 tracking-wide">
-              D A S H B O A R D
-            </h1>
-            <p className="text-slate-400 text-sm tracking-widest uppercase">Financial Overview</p>
-          </div>
-          <button
-            onClick={handleAddTransactionClick}
-            className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 border border-(--theme-accent) text-(--theme-accent) hover:bg-(--theme-accent)/10 transition-colors tracking-wider uppercase text-sm w-full sm:w-auto justify-center"
-          >
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="hidden xs:inline">Add Transaction</span>
-            <span className="xs:hidden">Add</span>
-          </button>
-        </div>
-
-        {/* Subscription Status */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between p-4 border border-slate-800 bg-slate-900/30 backdrop-blur-sm rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
-                {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                <Award className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <div className="text-slate-100 font-medium">
-                  {isAdmin ? 'Administrator' : tier === 'free' ? 'Essential' : tier === 'premium' ? 'Professional' : 'Enterprise'} Plan
-                </div>
-                <div className="text-slate-400 text-sm">
-                  {isAdmin ? 'Unlimited access to all features' : 'Full access to all features'}
-                </div>
-              </div>
-            </div>
-            <button
-              className={`px-4 py-2 font-medium rounded-lg transition-colors text-sm ${
-                isAdmin ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-600 hover:bg-slate-700 text-white'
-              }`}
-            >
-              {isAdmin ? 'Admin Panel' : 'Settings'}
-            </button>
-          </div>
-        </div>
-
-        {/* Card Balance Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
-          <button
-            onClick={() => {
-              setSelectedCardType('credit');
-              setShowCardsModal(true);
-            }}
-            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-blue-600/50 transition-colors text-left"
-          >
-            <div className="border-l-2 border-(--theme-accent) pl-4 sm:pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Credit Cards</div>
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.creditBalance)}</div>
-              <div className="text-slate-600 text-sm">{stats.creditCardCount} {stats.creditCardCount === 1 ? 'Card' : 'Cards'}</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedCardType('debit');
-              setShowCardsModal(true);
-            }}
-            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
-          >
-            <div className="border-l-2 border-(--theme-accent) pl-4 sm:pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Debit Cards</div>
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.debitBalance)}</div>
-              <div className="text-slate-600 text-sm">{stats.debitCardCount} {stats.debitCardCount === 1 ? 'Card' : 'Cards'}</div>
-            </div>
-          </button>
-        </div>
-
-        {/* Income/Expenses Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-12">
-          <button
-            onClick={() => router.push('/income')}
-            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-green-600/50 transition-colors text-left"
-          >
-            <div className="border-l-2 border-green-600 pl-4 sm:pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Income</div>
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.income)}</div>
-              <div className="text-slate-600 text-sm">Total Revenue</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => router.push('/expenses')}
-            className="border border-slate-800 bg-slate-900/50 p-4 sm:p-8 backdrop-blur-sm hover:border-red-600/50 transition-colors text-left"
-          >
-            <div className="border-l-2 border-red-600 pl-4 sm:pl-6">
-              <div className="text-slate-500 text-xs tracking-widest uppercase mb-2 sm:mb-3 font-serif">Expenses</div>
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.expenses)}</div>
-              <div className="text-slate-600 text-sm">Total Expenditure</div>
-            </div>
-          </button>
-        </div>
-
-        {/* Portfolio Section */}
-        <div className="mb-12">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-0.5 bg-linear-to-r from-(--theme-accent) to-transparent"></div>
-            <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Portfolio Overview</h2>
-          </div>
-
-          <div className="border border-slate-800 bg-slate-900/30 backdrop-blur-sm">
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-800">
-              <button
-                onClick={() => router.push('/cards')}
-                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
-              >
-                <div className="text-(--theme-accent) mb-2 sm:mb-3">
-                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                  <Award className="h-6 w-6 sm:h-8 sm:w-8 mx-auto" />
-                </div>
-                <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2">{cards.length}</div>
-                <div className="text-slate-500 text-xs tracking-widest uppercase">Accounts</div>
-              </button>
-              <button
-                onClick={() => router.push('/savings')}
-                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
-              >
-                <div className="text-(--theme-accent) mb-2 sm:mb-3">
-                  <div className="text-xl sm:text-3xl">◆</div>
-                </div>
-                <div className="text-xl sm:text-2xl lg:text-3xl font-serif text-slate-100 mb-2 break-all overflow-hidden text-ellipsis max-w-full">{formatAmount(stats.savings)}</div>
-                <div className="text-slate-500 text-xs tracking-widest uppercase">
-                  {savingsAccounts.length} {savingsAccounts.length === 1 ? 'Account' : 'Accounts'}
-                </div>
-              </button>
-              <button
-                onClick={() => router.push('/transactions')}
-                className="p-4 sm:p-8 text-center hover:bg-slate-900/50 transition-colors"
-              >
-                <div className="text-(--theme-accent) mb-2 sm:mb-3">
-                  <div className="text-xl sm:text-3xl">★</div>
-                </div>
-                <div className="text-2xl sm:text-3xl font-serif text-slate-100 mb-2">{transactions.length}</div>
-                <div className="text-slate-500 text-xs tracking-widest uppercase">Transactions</div>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-0.5 bg-linear-to-r from-(--theme-accent) to-transparent"></div>
-              <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Recent Activity</h2>
-            </div>
-            <button
-              onClick={() => router.push('/transactions')}
-              className="text-sm text-(--theme-accent) hover:text-(--theme-accent)/80 tracking-wider uppercase"
-            >
-              View All →
-            </button>
-          </div>
-
-          <div className="space-y-1">
-            {transactions.length > 0 ? (
-              transactions.map((transaction) => (
-                <div key={transaction.id} className="border-b border-slate-800 py-6 hover:bg-slate-900/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div className={`w-1 h-12 ${transaction.type === 'income' ? 'bg-green-600' : 'bg-(--theme-accent)'}`}></div>
-                      <div>
-                        <div className="text-slate-200 font-serif mb-1">{transaction.description}</div>
-                        <div className="text-slate-600 text-xs tracking-wider uppercase">{transaction.category}</div>
-                      </div>
-                    </div>
-                    <div className={`font-serif text-lg sm:text-xl ${transaction.type === 'income' ? 'text-green-400' : 'text-slate-300'} break-all max-w-full`}>
-                      {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-12 text-slate-500 font-serif">
-                No recent transactions
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Analytics Section */}
-        <div className="mb-12">
-          <DashboardAnalytics key={analyticsKey} />
-        </div>
-
-        {/* Quote */}
-        <div className="text-center py-12 border-t border-slate-800">
-          <div className="text-(--theme-accent)/40 text-6xl mb-4">&ldquo;</div>
-          <p className="text-slate-400 text-lg font-serif italic mb-4 max-w-2xl mx-auto">
-            Wealth consists not in having great possessions, but in having few wants.
-          </p>
-          <div className="text-slate-600 text-sm tracking-widest">— EPICTETUS</div>
-        </div>
-    </div>
+    </>
   );
 }
 
 export default function Dashboard() {
-  return (
-    <AuthGate>
-      <DashboardContent />
-    </AuthGate>
-  );
+  return <DashboardContent />;
 }

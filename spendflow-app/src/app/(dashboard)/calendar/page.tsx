@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { ChevronLeft, ChevronRight, Clock, CreditCard, Trash2 } from 'lucide-react';
 import { cardsService } from '@/lib/firebase/firestore';
 import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
 import { RecurringExpense } from '@/types/recurring';
@@ -185,7 +184,7 @@ function CalendarPageContent() {
           onClick={previousMonth}
           className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 border border-slate-700 text-slate-300 hover:border-amber-600/50 hover:text-amber-400 transition-all touch-manipulation min-h-[40px] sm:min-h-[44px] md:min-h-auto rounded-md"
         >
-          <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+          <span className="text-lg">‹</span>
           <span className="font-serif tracking-wider text-xs sm:text-sm md:text-base hidden xs:inline">Previous</span>
         </button>
 
@@ -208,7 +207,7 @@ function CalendarPageContent() {
           className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 border border-slate-700 text-slate-300 hover:border-amber-600/50 hover:text-amber-400 transition-all touch-manipulation min-h-[40px] sm:min-h-[44px] md:min-h-auto rounded-md"
         >
           <span className="font-serif tracking-wider text-xs sm:text-sm md:text-base hidden xs:inline">Next</span>
-          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+          <span className="text-lg">›</span>
         </button>
       </div>
 
@@ -301,7 +300,7 @@ function CalendarPageContent() {
                         title={isTouchDevice ? undefined : `${expense.name} - ${formatAmount(expense.amount)}`}
                       >
                         <div className="flex items-center gap-0.5">
-                          <Clock className="h-1.5 w-1.5 sm:h-2 sm:w-2" />
+                          <span className="text-xs">⏰</span>
                           <span className="truncate text-[10px] sm:text-xs">{expense.name}</span>
                         </div>
                       </div>
@@ -315,7 +314,7 @@ function CalendarPageContent() {
                         title={isTouchDevice ? undefined : `${card.name} Payment Due`}
                       >
                         <div className="flex items-center gap-0.5">
-                          <CreditCard className="h-1.5 w-1.5 sm:h-2 sm:w-2" />
+                          <span className="text-xs">💳</span>
                           <span className="truncate text-[10px] sm:text-xs">{isTouchDevice ? 'Payment' : `${card.name} Payment`}</span>
                         </div>
                       </div>
@@ -403,7 +402,7 @@ function CalendarPageContent() {
                                 className="text-slate-500 hover:text-red-400 transition-colors p-1 hover:bg-slate-700 rounded"
                                 title="Delete expense"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <span className="text-xs">🗑️</span>
                               </button>
                             </div>
                           </div>

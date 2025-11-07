@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { auth } from '@/firebase/config';
 
 type AuthContextType = {
@@ -24,9 +24,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    // Set Firebase persistence to local (remembers user across browser sessions)
+    setPersistence(auth, browserLocalPersistence).catch((error) => {
+      console.error('Error setting auth persistence:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      setLoading(false);
 
       // Check if user is admin based on email
       if (currentUser?.email) {
@@ -35,6 +39,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setIsAdmin(false);
       }
+
+      setLoading(false);
     });
 
     return () => unsubscribe();

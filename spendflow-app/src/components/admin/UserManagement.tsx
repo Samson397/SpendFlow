@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usersService } from '@/lib/firebase/firestore';
 import { monitorAllUsersStatus } from '@/lib/firebase/presence';
 import { toast } from 'react-hot-toast';
-import { Search, Filter, Clock, Eye, User, UserCheck, UserX, Shield } from 'lucide-react';
 import { UserProfile } from '@/types';
 import { alertsService } from '@/lib/alerts';
 
@@ -209,6 +208,26 @@ export default function UserManagement() {
     }
   };
 
+  const updateUserSubscription = async (userId: string, tier: 'free' | 'pro' | 'enterprise') => {
+    try {
+      await usersService.update(userId, { subscriptionTier: tier });
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, subscriptionTier: tier } : user
+      ));
+      toast.success(`User subscription updated to ${tier}`);
+      
+      // Generate admin action alert
+      try {
+        await alertsService.adminAction(currentUser?.email || 'Unknown Admin', `Updated user subscription to ${tier}`, userId);
+      } catch (alertError) {
+        console.warn('Failed to create subscription change alert:', alertError);
+      }
+    } catch (error) {
+      console.error('Error updating user subscription:', error);
+      toast.error('Failed to update user subscription');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -224,7 +243,7 @@ export default function UserManagement() {
         </div>
         <div className="w-full sm:w-auto flex gap-2">
           <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🔍</span>
             <input
               type="text"
               placeholder="Search users..."
@@ -251,7 +270,7 @@ export default function UserManagement() {
               showFilter ? 'bg-slate-700' : 'bg-slate-800 hover:bg-slate-700 border border-slate-700'
             }`}
           >
-            <Filter className="h-4 w-4" />
+            <span className="text-sm">🔧</span>
             <span className="hidden sm:inline">Filter</span>
             {(statusFilter !== 'all' || verificationFilter !== 'all' || roleFilter !== 'all') && (
               <span className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-600 text-xs">
@@ -362,7 +381,7 @@ export default function UserManagement() {
                         <div className="flex items-center">
                             <div className="relative shrink-0">
                             <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center">
-                              <User className="h-5 w-5 text-slate-300" />
+                              <span className="text-lg">👤</span>
                             </div>
                             <div className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-slate-800 ${
                               onlineStatus[user.uid] === undefined ? 'bg-gray-500' : onlineStatus[user.uid] ? 'bg-green-500' : 'bg-slate-500'
@@ -450,7 +469,7 @@ export default function UserManagement() {
                                 </span>
                               </div>
                               <div className="flex items-center text-xs text-slate-500" title={`Last active: ${new Date(user.lastActive).toLocaleString()}`}>
-                                <Clock className="h-3 w-3 mr-1" />
+                                <span className="text-xs">⏰</span>
                                 {getTimeAgo(user.lastActive)}
                               </div>
                             </div>
@@ -469,21 +488,21 @@ export default function UserManagement() {
                             className="text-amber-400 hover:text-amber-300"
                             title="View Details"
                           >
-                            <Eye className="h-4 w-4" />
+                            <span className="text-sm">👁️</span>
                           </button>
                           <button
                             onClick={() => toggleUserRole(user.id, user.isAdmin || false)}
                             className={user.isAdmin ? "text-blue-400 hover:text-slate-400" : "text-slate-400 hover:text-blue-400"}
                             title={user.isAdmin ? "Demote to User" : "Promote to Admin"}
                           >
-                            <Shield className="h-4 w-4" />
+                            <span className="text-sm">🛡️</span>
                           </button>
                           <button
                             onClick={() => toggleUserStatus(user.id, !user.disabled)}
                             className={user.disabled ? "text-green-400 hover:text-green-300" : "text-red-400 hover:text-red-300"}
                             title={user.disabled ? "Activate User" : "Deactivate User"}
                           >
-                            {user.disabled ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
+                            {user.disabled ? <span className="text-sm">✅</span> : <span className="text-sm">❌</span>}
                           </button>
                         </div>
                       </td>
@@ -492,7 +511,7 @@ export default function UserManagement() {
                 ) : (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                      <User className="h-12 w-12 mx-auto text-slate-600 mb-2" />
+                      <span className="text-4xl">👤</span>
                       <p>No users found</p>
                       <p className="text-sm mt-1">Try adjusting your search or filter criteria</p>
                     </td>
@@ -527,7 +546,7 @@ export default function UserManagement() {
               <div className="mt-6 space-y-4">
                 <div className="flex items-center space-x-4">
                   <div className="h-16 w-16 bg-slate-800 rounded-full flex items-center justify-center">
-                    <User className="h-8 w-8 text-amber-400" />
+                    <span className="text-4xl">👤</span>
                   </div>
                   <div>
                     <h4 className="text-lg font-medium text-slate-100">{selectedUser.displayName || 'No Name'}</h4>
@@ -542,7 +561,7 @@ export default function UserManagement() {
                       </span>
                       {selectedUser.isAdmin && (
                         <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-900/30 text-blue-400 flex items-center">
-                          <Shield className="h-3 w-3 mr-1" />
+                          <span className="text-xs mr-1">🛡️</span>
                           Admin
                         </span>
                       )}
@@ -589,19 +608,19 @@ export default function UserManagement() {
                         <div className="flex items-center gap-2">
                           {(selectedUser.subscriptionTier === 'free' || !selectedUser.subscriptionTier) && (
                             <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-900/30 text-gray-400">
-                              <User className="h-3 w-3 mr-1" />
+                              <span className="text-xs mr-1">👤</span>
                               Free
                             </span>
                           )}
                           {selectedUser.subscriptionTier === 'pro' && (
                             <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-900/30 text-blue-400">
-                              <Star className="h-3 w-3 mr-1" />
+                              <span className="text-xs mr-1">⭐</span>
                               Pro
                             </span>
                           )}
                           {selectedUser.subscriptionTier === 'enterprise' && (
                             <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-900/30 text-amber-400">
-                              <Crown className="h-3 w-3 mr-1" />
+                              <span className="text-xs mr-1">👑</span>
                               Enterprise
                             </span>
                           )}
@@ -621,7 +640,7 @@ export default function UserManagement() {
                               : 'border-gray-600 text-gray-400 hover:bg-gray-600/20'
                           }`}
                         >
-                          <User className="h-4 w-4 xs:mr-1" />
+                          <span className="text-sm">👤</span>
                           <span className="hidden xs:inline">Free</span>
                         </button>
                         <button
@@ -636,7 +655,7 @@ export default function UserManagement() {
                               : 'border-blue-600 text-blue-400 hover:bg-blue-600/20'
                           }`}
                         >
-                          <Star className="h-4 w-4 xs:mr-1" />
+                          <span className="text-sm">⭐</span>
                           <span className="hidden xs:inline">Pro</span>
                         </button>
                         <button
@@ -651,7 +670,7 @@ export default function UserManagement() {
                               : 'border-amber-600 text-amber-400 hover:bg-amber-600/20'
                           }`}
                         >
-                          <Crown className="h-4 w-4 xs:mr-1" />
+                          <span className="text-sm">👑</span>
                           <span className="hidden xs:inline">Enterprise</span>
                         </button>
                       </div>

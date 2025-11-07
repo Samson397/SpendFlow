@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Wrench, Clock, Mail, RefreshCw } from 'lucide-react';
 
 export default function MaintenancePage() {
   const [settings, setSettings] = useState<any>(null);
@@ -102,7 +101,7 @@ export default function MaintenancePage() {
       <div className="max-w-md w-full bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 shadow-2xl p-8 text-center">
         {/* Icon */}
         <div className="mx-auto w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mb-6">
-          <Wrench className="h-8 w-8 text-amber-400" />
+          <span className="text-2xl">🔧</span>
         </div>
 
         {/* Title */}
@@ -114,7 +113,7 @@ export default function MaintenancePage() {
         {/* Status Card */}
         <div className="bg-slate-900/50 rounded-lg p-4 mb-6 border border-slate-700/50">
           <div className="flex items-center justify-center space-x-2 text-sm text-slate-300 mb-2">
-            <Clock className="h-4 w-4" />
+            <span className="text-sm">⏰</span>
             <span>Expected Duration</span>
           </div>
           <p className="text-amber-400 font-medium">A few hours</p>
@@ -123,7 +122,7 @@ export default function MaintenancePage() {
         {/* Contact Info */}
         <div className="bg-slate-900/50 rounded-lg p-4 mb-6 border border-slate-700/50">
           <div className="flex items-center justify-center space-x-2 text-sm text-slate-300 mb-2">
-            <Mail className="h-4 w-4" />
+            <span className="text-sm">📧</span>
             <span>Need Help?</span>
           </div>
           <a
@@ -139,7 +138,7 @@ export default function MaintenancePage() {
           onClick={handleRefresh}
           className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
         >
-          <RefreshCw className="h-4 w-4" />
+          <span className="text-sm">🔄</span>
           <span>Check Again</span>
         </button>
 

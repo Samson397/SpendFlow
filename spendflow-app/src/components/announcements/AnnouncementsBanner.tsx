@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Megaphone, Clock } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
   collection, 
@@ -215,18 +214,18 @@ export function AnnouncementsBanner() {
   };
 
   const getTypeStyles = (type: string) => {
-    const baseStyles = 'relative overflow-hidden group transform hover:scale-[1.01] transition-all duration-300 border border-white/20';
-    
+    const baseStyles = 'relative overflow-hidden bg-white shadow-2xl';
+
     switch (type) {
       case 'warning':
-        return `${baseStyles} bg-gradient-to-br from-amber-500/20 via-amber-400/25 to-amber-300/30 border-l-4 border-amber-400 shadow-lg shadow-amber-500/10`;
+        return `${baseStyles} border-l-4 border-amber-400`;
       case 'critical':
-        return `${baseStyles} bg-gradient-to-br from-red-600/20 via-red-500/25 to-red-400/30 border-l-4 border-red-500 shadow-lg shadow-red-500/10`;
+        return `${baseStyles} border-l-4 border-red-500`;
       case 'success':
-        return `${baseStyles} bg-gradient-to-br from-emerald-600/20 via-emerald-500/25 to-emerald-400/30 border-l-4 border-emerald-500 shadow-lg shadow-emerald-500/10`;
+        return `${baseStyles} border-l-4 border-emerald-500`;
       case 'info':
       default:
-        return `${baseStyles} bg-gradient-to-br from-sky-600/20 via-sky-500/25 to-sky-400/30 border-l-4 border-sky-500 shadow-lg shadow-sky-500/10`;
+        return `${baseStyles} border-l-4 border-sky-500`;
     }
   };
 
@@ -270,96 +269,179 @@ export function AnnouncementsBanner() {
   };
 
   return (
-    <div className="w-full bg-gradient-to-r from-amber-50/90 via-white to-amber-50/90 border-b border-amber-100 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <motion.div 
-          className="space-y-3 py-1"
-          variants={container}
-          initial="hidden"
-          animate="show"
+    <AnimatePresence>
+      {visibleAnnouncements.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
         >
-          {visibleAnnouncements.map((announcement, index) => {
-            const gradientColors = {
-              warning: 'from-amber-500/5 via-amber-400/10 to-amber-300/20',
-              critical: 'from-red-500/5 via-red-400/10 to-red-300/20',
-              success: 'from-emerald-500/5 via-emerald-400/10 to-emerald-300/20',
-              info: 'from-sky-500/5 via-sky-400/10 to-sky-300/20',
-              default: 'from-slate-500/5 via-slate-400/10 to-slate-300/20'
-            };
-            
-            const typeColor = announcement.type in gradientColors 
-              ? gradientColors[announcement.type as keyof typeof gradientColors] 
-              : gradientColors.default;
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl"
+            onClick={() => dismissAnnouncement(visibleAnnouncements[0].id)}
+          />
 
-            return (
-              <motion.div
-                key={announcement.id}
-                variants={item}
-                className={`relative rounded-xl p-5 backdrop-blur-sm ${getTypeStyles(announcement.type)}`}
-                whileHover={{
-                  y: -2,
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                }}
-                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-              >
-                {/* Animated background gradient */}
-                <div className={`absolute inset-0 rounded-lg bg-gradient-to-r ${typeColor} opacity-0 group-hover:opacity-70 transition-opacity duration-300 -z-10`} />
-                
-                {/* Glow effect */}
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-400/20 to-pink-400/20 rounded-lg filter blur opacity-0 group-hover:opacity-100 transition duration-300 -z-20" />
-                
-                <div className="relative z-10">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-white/80 shadow-md flex items-center justify-center backdrop-blur-sm">
-                        <Megaphone className="h-5 w-5 text-amber-600" />
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="relative max-w-lg w-full mx-auto"
+          >
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+              {/* Premium background layers */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/95 via-white/90 to-white/95 backdrop-blur-2xl" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-slate-50/80 via-white/60 to-slate-50/80" />
+
+              {/* Animated gradient overlay */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${
+                visibleAnnouncements[0].type === 'warning' ? 'from-amber-500/8 via-amber-400/12 to-amber-300/8' :
+                visibleAnnouncements[0].type === 'critical' ? 'from-red-500/8 via-red-400/12 to-red-300/8' :
+                visibleAnnouncements[0].type === 'success' ? 'from-emerald-500/8 via-emerald-400/12 to-emerald-300/8' :
+                'from-sky-500/8 via-sky-400/12 to-sky-300/8'
+              }`} />
+
+              {/* Subtle pattern overlay */}
+              <div className="absolute inset-0 opacity-[0.015] bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.3)_1px,transparent_0)] bg-[length:24px_24px]" />
+
+              {/* Inner glow effect */}
+              <div className={`absolute inset-1 rounded-3xl bg-gradient-to-br ${
+                visibleAnnouncements[0].type === 'warning' ? 'from-amber-200/20 via-transparent to-amber-100/10' :
+                visibleAnnouncements[0].type === 'critical' ? 'from-red-200/20 via-transparent to-red-100/10' :
+                visibleAnnouncements[0].type === 'success' ? 'from-emerald-200/20 via-transparent to-emerald-100/10' :
+                'from-sky-200/20 via-transparent to-sky-100/10'
+              }`} />
+
+              {/* Type-specific accent border */}
+              <div className={`absolute inset-0 rounded-3xl border-2 ${
+                visibleAnnouncements[0].type === 'warning' ? 'border-amber-300/30' :
+                visibleAnnouncements[0].type === 'critical' ? 'border-red-300/30' :
+                visibleAnnouncements[0].type === 'success' ? 'border-emerald-300/30' :
+                'border-sky-300/30'
+              }`} />
+
+              <div className="relative z-10 p-10">
+                {/* Header with integrated megaphone and type */}
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className={`relative p-4 rounded-2xl shadow-lg ${
+                      visibleAnnouncements[0].type === 'warning' ? 'bg-gradient-to-br from-amber-100 to-amber-200 shadow-amber-500/20' :
+                      visibleAnnouncements[0].type === 'critical' ? 'bg-gradient-to-br from-red-100 to-red-200 shadow-red-500/20' :
+                      visibleAnnouncements[0].type === 'success' ? 'bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-emerald-500/20' :
+                      'bg-gradient-to-br from-sky-100 to-sky-200 shadow-sky-500/20'
+                    }`}>
+                      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="#374151" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                      </svg>
+                      {/* Type indicator overlay */}
+                      <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                        visibleAnnouncements[0].type === 'warning' ? 'bg-amber-500' :
+                        visibleAnnouncements[0].type === 'critical' ? 'bg-red-500' :
+                        visibleAnnouncements[0].type === 'success' ? 'bg-emerald-500' :
+                        'bg-sky-500'
+                      }`}>
+                        {visibleAnnouncements[0].type === 'warning' ? '!' :
+                         visibleAnnouncements[0].type === 'critical' ? '‼' :
+                         visibleAnnouncements[0].type === 'success' ? '✓' :
+                         'ℹ'}
                       </div>
                     </div>
-                    <div className="ml-4 flex-1 min-w-0">
-                      <div className="flex items-center">
-                        <h3 className="text-base font-bold text-gray-900">
-                          {announcement.title}
-                        </h3>
-                        <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200/50">
-                          New
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-gray-800 leading-relaxed">
-                        {announcement.content}
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-800 mb-1">
+                        {visibleAnnouncements[0].type === 'warning' ? 'Important Notice' :
+                         visibleAnnouncements[0].type === 'critical' ? 'Critical Alert' :
+                         visibleAnnouncements[0].type === 'success' ? 'Great News' :
+                         'Announcement'}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {getRelativeTime(visibleAnnouncements[0].createdAt)}
                       </p>
-                      <div className="mt-2.5 flex items-center text-xs font-medium text-gray-600">
-                        <Clock className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
-                        <span>{getRelativeTime(announcement.createdAt)}</span>
-                      </div>
-                    </div>
-                    <div className="ml-4 flex-shrink-0">
-                      <button
-                        type="button"
-                        className="group relative inline-flex items-center justify-center rounded-full p-1.5 text-gray-500 hover:bg-white/70 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all duration-200 hover:scale-110"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dismissAnnouncement(announcement.id);
-                        }}
-                      >
-                        <span className="absolute -inset-1 rounded-full bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <X className="h-4 w-4 relative" aria-hidden="true" />
-                        <span className="sr-only">Dismiss</span>
-                      </button>
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => dismissAnnouncement(visibleAnnouncements[0].id)}
+                    className="p-3 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                
-                {/* Animated border bottom */}
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-400 via-pink-400 to-purple-500 rounded-full scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500" />
-                
+
+                {/* Content */}
+                <div className="text-center space-y-6">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-3 leading-tight">
+                      {visibleAnnouncements[0].title}
+                    </h2>
+                    <div className="w-16 h-1 bg-gradient-to-r from-gray-300 to-gray-400 mx-auto rounded-full"></div>
+                  </div>
+
+                  <p className="text-gray-700 text-lg leading-relaxed max-w-md mx-auto font-medium">
+                    {visibleAnnouncements[0].content}
+                  </p>
+
+                  {/* Premium action button */}
+                  <div className="pt-4">
+                    <button
+                      onClick={() => dismissAnnouncement(visibleAnnouncements[0].id)}
+                      className={`group relative px-10 py-4 rounded-2xl font-bold text-white text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-2xl ${
+                        visibleAnnouncements[0].type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-amber-500/50' :
+                        visibleAnnouncements[0].type === 'critical' ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-red-500/50' :
+                        visibleAnnouncements[0].type === 'success' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/50' :
+                        'bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 shadow-sky-500/50'
+                      }`}
+                    >
+                      <span className="relative z-10 flex items-center gap-2">
+                        Got it, thanks!
+                        <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </span>
+                      {/* Button shine effect */}
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                    </button>
+                  </div>
+
+                  {/* Multiple announcements indicator with premium styling */}
+                  {visibleAnnouncements.length > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <div className="flex -space-x-1">
+                        {Array.from({ length: Math.min(visibleAnnouncements.length - 1, 3) }).map((_, i) => (
+                          <div key={i} className="w-2 h-2 rounded-full bg-gray-300 border border-white"></div>
+                        ))}
+                      </div>
+                      <p className="text-sm text-gray-500 font-medium">
+                        {visibleAnnouncements.length - 1} more announcement{visibleAnnouncements.length - 1 > 1 ? 's' : ''} available
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Decorative elements */}
-                <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-amber-200/30 -z-10" />
-                <div className="absolute -left-2 -bottom-2 h-12 w-12 rounded-full bg-pink-200/30 -z-10" />
-              </motion.div>
-            );
-          })}
+                <div className={`absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20 -z-10 ${
+                  visibleAnnouncements[0].type === 'warning' ? 'bg-amber-400' :
+                  visibleAnnouncements[0].type === 'critical' ? 'bg-red-400' :
+                  visibleAnnouncements[0].type === 'success' ? 'bg-emerald-400' :
+                  'bg-sky-400'
+                }`} />
+                <div className={`absolute -left-2 -bottom-2 h-12 w-12 rounded-full opacity-20 -z-10 ${
+                  visibleAnnouncements[0].type === 'warning' ? 'bg-amber-400' :
+                  visibleAnnouncements[0].type === 'critical' ? 'bg-red-400' :
+                  visibleAnnouncements[0].type === 'success' ? 'bg-emerald-400' :
+                  'bg-sky-400'
+                }`} />
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

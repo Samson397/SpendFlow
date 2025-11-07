@@ -4,7 +4,14 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles } from 'lucide-react';
 import { deepSeekService } from '@/lib/services/deepSeekService';
 import { useAuth } from '@/contexts/AuthContext';
-import { transactionsService, cardsService } from '@/lib/firebase/firestore';
+import {
+  transactionsService,
+  cardsService,
+  usersService,
+  expensesService,
+  incomeService,
+  categoriesService
+} from '@/lib/firebase/firestore';
 import toast from 'react-hot-toast';
 
 interface Message {
@@ -15,7 +22,7 @@ interface Message {
 }
 
 interface AIAnalysis {
-  type: 'spending' | 'budget' | 'goals' | 'advice';
+  type: 'wallet' | 'transactions' | 'spending' | 'budget' | 'goals' | 'advice';
   title: string;
   action: () => Promise<string>;
 }
@@ -25,12 +32,110 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [cachedWalletData, setCachedWalletData] = useState<{
-    cards: any[];
-    totalBalance: number;
-    timestamp: number;
+  const [userData, setUserData] = useState<{
+    profile?: any;
+    cards?: any[];
+    transactions?: any[];
+    expenses?: any[];
+    income?: any[];
+    categories?: any[];
+    totalBalance?: number;
+    monthlyIncome?: number;
+    monthlyExpenses?: number;
+    spendingByCategory?: Record<string, number>;
+    transactionCount?: number;
+    loadedAt?: Date;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Add welcome message on mount
+  useEffect(() => {
+    if (messages.length === 0) {
+      if (!deepSeekService) {
+        addMessage('assistant', '⚠️ **AI Service Not Configured**\n\nThe AI assistant requires a DeepSeek API key to function. To enable AI features:\n\n1. Get an API key from [DeepSeek](https://platform.deepseek.com/)\n2. Add it to your `.env.local` file as:\n   `NEXT_PUBLIC_DEEPSEEK_API_KEY=your_key_here`\n3. Restart the development server\n\nOnce configured, I can help you with:\n• Financial analysis\n• Spending insights\n• Budget recommendations\n• Savings goals');
+      } else if (loading) {
+        addMessage('assistant', '🔄 **Loading your complete financial data...**\n\nI\'m accessing all your financial information from Firebase to provide personalized advice. This includes your cards, transactions, expenses, and income data.\n\n⏳ Please wait a moment while I load everything...');
+      } else {
+        addMessage('assistant', '👋 **Welcome to your AI Financial Assistant!**\n\nI\'m loading your complete financial profile... I can help you with:\n\n💳 Check your wallet and card balances\n📊 Analyze your spending patterns\n💰 Provide budget recommendations\n🎯 Help you set and achieve savings goals\n\nHow can I assist you today?');
+      }
+    }
+  }, [messages.length, deepSeekService, loading]);
+
+  // Load comprehensive user data from ALL collections
+  useEffect(() => {
+    const loadAllUserData = async () => {
+      if (!user) return;
+
+      try {
+        setLoading(true);
+
+        // Load ALL user data from all collections simultaneously
+        const [
+          profile,
+          cards,
+          transactions,
+          expenses,
+          income,
+          categories
+        ] = await Promise.all([
+          usersService.get(user.uid),
+          cardsService.getByUserId(user.uid),
+          transactionsService.getByUserId(user.uid),
+          expensesService.getActiveByUserId(user.uid),
+          incomeService.getByUserId(user.uid),
+          categoriesService.getAll()
+        ]);
+
+        // Calculate financial summaries
+        const totalBalance = cards.reduce((sum, card) => {
+          if (card.type === 'credit') {
+            return sum + ((card.limit || 0) - card.balance);
+          } else {
+            return sum + card.balance;
+          }
+        }, 0);
+
+        const monthlyIncome = transactions
+          .filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + t.amount, 0);
+
+        const monthlyExpenses = transactions
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + t.amount, 0);
+
+        const spendingByCategory: Record<string, number> = {};
+        transactions.forEach(t => {
+          if (t.type === 'expense') {
+            spendingByCategory[t.category] = (spendingByCategory[t.category] || 0) + t.amount;
+          }
+        });
+
+        const comprehensiveUserData = {
+          profile,
+          cards,
+          transactions,
+          expenses,
+          income,
+          categories,
+          totalBalance,
+          monthlyIncome,
+          monthlyExpenses,
+          spendingByCategory,
+          transactionCount: transactions.length,
+          loadedAt: new Date()
+        };
+
+        setUserData(comprehensiveUserData);
+
+      } catch (error) {
+        console.error('Error loading comprehensive user data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllUserData();
+  }, [user]);
 
   // Predefined AI analysis options
   const analysisOptions: AIAnalysis[] = [
@@ -40,46 +145,52 @@ export function AIAssistant() {
       action: async () => {
         if (!user) throw new Error('User not authenticated');
 
-        // Check cache first (valid for 5 minutes)
-        const now = Date.now();
-        const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+        // Use comprehensive user data
+        if (userData?.cards && userData.cards.length > 0) {
+          const walletSummary = userData.cards.map(card => ({
+            name: card.name,
+            balance: card.balance,
+            type: card.type,
+            lastFour: card.lastFour || '****'
+          }));
 
-        let cards: any[];
-        let totalBalance: number;
-
-        if (cachedWalletData && (now - cachedWalletData.timestamp) < CACHE_DURATION) {
-          cards = cachedWalletData.cards;
-          totalBalance = cachedWalletData.totalBalance;
-        } else {
-          // Fetch fresh data
-          cards = await cardsService.getByUserId(user.uid);
-          totalBalance = cards.reduce((sum, card) => sum + card.balance, 0);
-
-          // Cache the data
-          setCachedWalletData({
-            cards,
-            totalBalance,
-            timestamp: now
-          });
-        }
-
-        if (cards.length === 0) {
           return deepSeekService!.getFinancialAdvice(
-            'The user has no cards in their wallet. They should add some cards to track their finances.',
-            { context: 'empty_wallet' }
+            `Here's my current wallet status: Total balance across ${userData.cards.length} cards: $${userData.totalBalance?.toFixed(2)}\n\nCard details: ${JSON.stringify(walletSummary)}\n\nPlease provide a summary of my wallet status and any financial insights.`,
+            { context: 'wallet_check' }
           );
         }
 
-        const walletSummary = cards.map(card => ({
-          name: card.name,
-          balance: card.balance,
-          type: card.type,
-          lastFour: card.lastFour || '****'
-        }));
+        return deepSeekService!.getFinancialAdvice(
+          'You don\'t have any cards in your wallet yet. Add some cards to start tracking your finances.',
+          { context: 'empty_wallet' }
+        );
+      }
+    },
+    {
+      type: 'transactions',
+      title: '📊 Recent Transactions',
+      action: async () => {
+        if (!user) throw new Error('User not authenticated');
+
+        // Use comprehensive user data
+        if (userData?.transactions && userData.transactions.length > 0) {
+          const recentTransactions = userData.transactions.slice(0, 10).map(t => ({
+            amount: t.amount,
+            category: t.category,
+            description: t.description,
+            date: t.date,
+            type: t.type
+          }));
+
+          return deepSeekService!.getFinancialAdvice(
+            `Here are my recent transactions: ${JSON.stringify(recentTransactions)}\n\nPlease analyze my spending patterns and provide insights about my financial habits.`,
+            { context: 'transaction_analysis' }
+          );
+        }
 
         return deepSeekService!.getFinancialAdvice(
-          `Here's my current wallet status: Total balance across ${cards.length} cards: $${totalBalance.toFixed(2)}\n\nCard details: ${JSON.stringify(walletSummary)}\n\nPlease provide a summary of my wallet status and any financial insights.`,
-          { context: 'wallet_check' }
+          'You haven\'t made any transactions yet. Start by adding some income or expenses to track your finances.',
+          { context: 'no_transactions' }
         );
       }
     },
@@ -89,15 +200,27 @@ export function AIAssistant() {
       action: async () => {
         if (!user) throw new Error('User not authenticated');
 
-        const [transactions, cards] = await Promise.all([
-          transactionsService.getByUserId(user.uid),
-          cardsService.getByUserId(user.uid)
-        ]);
+        // Use comprehensive user data
+        if (userData?.transactions && userData?.cards) {
+          const spendingSummary = {
+            totalIncome: userData.monthlyIncome,
+            totalExpenses: userData.monthlyExpenses,
+            spendingByCategory: userData.spendingByCategory,
+            totalBalance: userData.totalBalance,
+            transactionCount: userData.transactionCount
+          };
 
-        return deepSeekService!.analyzeSpendingPatterns(transactions, {
-          totalCards: cards.length,
-          totalBalance: cards.reduce((sum, card) => sum + card.balance, 0),
-        });
+          return deepSeekService!.analyzeSpendingPatterns([], {
+            totalCards: userData.cards.length,
+            totalBalance: userData.totalBalance || 0,
+            precomputedSummary: spendingSummary
+          });
+        }
+
+        return deepSeekService!.getFinancialAdvice(
+          'I need more data to analyze your spending. Add some transactions first.',
+          { context: 'insufficient_data' }
+        );
       }
     },
     {
@@ -106,21 +229,15 @@ export function AIAssistant() {
       action: async () => {
         if (!user) throw new Error('User not authenticated');
 
-        const transactions = await transactionsService.getByUserId(user.uid);
-
-        // Estimate monthly income from positive transactions (deposits/income)
-        const incomeTransactions = transactions.filter(t => t.amount > 0);
-        let estimatedMonthlyIncome = 4000; // Default fallback
-
-        if (incomeTransactions.length > 0) {
-          const averageIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0) / incomeTransactions.length;
-          // If average income seems reasonable (> $500), use it
-          if (averageIncome > 500) {
-            estimatedMonthlyIncome = Math.round(averageIncome);
-          }
+        // Use comprehensive user data
+        if (userData?.transactions && userData?.monthlyIncome) {
+          return deepSeekService!.generateBudgetRecommendations([], userData.monthlyIncome);
         }
 
-        return deepSeekService!.generateBudgetRecommendations(transactions, estimatedMonthlyIncome);
+        return deepSeekService!.getFinancialAdvice(
+          'I need income data to create budget recommendations. Add some income transactions first.',
+          { context: 'insufficient_income_data' }
+        );
       }
     },
     {
@@ -151,43 +268,44 @@ export function AIAssistant() {
 
   // Add initial welcome message
   useEffect(() => {
-    if (messages.length === 0) {
-      const welcomeMessage = {
-        id: 'welcome',
+    if (messages.length === 1 && userData) {
+      // Replace loading message with personalized welcome
+      const personalizedMessage = {
+        id: 'personalized-welcome',
         role: 'assistant' as const,
-        content: !deepSeekService
-          ? `⚠️ **AI Service Not Configured**
+        content: `👋 **Hi ${userData.profile?.displayName || user?.displayName || 'User'}!** Welcome back to your AI Financial Assistant!
 
-The AI assistant requires a DeepSeek API key to function. To enable AI features:
+I have access to ALL your financial data:
+• 💳 **${userData.cards?.length || 0} Cards** with total balance of **$${userData.totalBalance?.toFixed(2) || '0.00'}**
+• 📊 **${userData.transactions?.length || 0} Transactions** analyzed
+• 💰 **${userData.expenses?.length || 0} Recurring expenses** tracked
+• 💵 **${userData.income?.length || 0} Income sources** monitored
+• 📅 **Member since:** ${userData.profile?.createdAt ? new Date(userData.profile.createdAt).toLocaleDateString() : 'Recently'}
 
-1. Get an API key from [DeepSeek](https://platform.deepseek.com/)
-2. Add it to your \`.env.local\` file as:
-   \`NEXT_PUBLIC_DEEPSEEK_API_KEY=your_api_key_here\`
-3. Restart the development server
+I can help you with:
+• 💳 **"What's in my wallet?"** - Complete card details and balances
+• 📊 **"What did I spend on?"** - Detailed transaction analysis
+• 💰 **"How much did I spend this month?"** - Monthly spending breakdown
+• 🎯 **"What are my biggest expenses?"** - Category spending analysis
+• 📅 **"When do I have upcoming bills?"** - Recurring expenses schedule
+• 💡 **"How can I save money?"** - Personalized budget recommendations
+• 📈 **"What's my financial health?"** - Comprehensive financial assessment
 
-Once configured, you'll be able to:
-• 💳 Check your wallet balances
-• 📊 Analyze spending patterns  
-• 💰 Get budget recommendations
-• 🎯 Set savings goals
-• 💬 Ask financial questions`
-          : `👋 Hi! I'm your AI financial assistant. I can help you with:
+**Try asking me questions like:**
+• "What are my recent expenses?"
+• "How much do I have in my wallet?"
+• "What's my spending on food this month?"
+• "Do I have any upcoming bills?"
+• "What's my net worth?"
 
-• 💳 **Check My Wallet** - View your current balances across all cards
-• 📊 **Analyze My Spending** - Understand your spending patterns and habits  
-• 💰 **Budget Recommendations** - Get personalized budget plans based on your income
-• 🎯 **Savings Goals Help** - Set and track realistic financial goals
-• 💬 **General Financial Questions** - Ask me anything about money management
-
-You can ask me general questions like:
-"How do I start investing?" • "What's compound interest?" • "How to pay off credit card debt?" • "Best savings accounts?" • "Emergency fund tips?"
-
-Click any button below or type your questions - I'll access your real financial data for personalized advice, or provide general guidance for any money topic!`,
+Click any button below or ask me anything - I have access to your complete financial universe!`,
         timestamp: new Date()
       };
-      setMessages([welcomeMessage]);
+
+      // Replace the loading message with personalized welcome
+      setMessages([personalizedMessage]);
     }
-  }, [messages.length, deepSeekService]);
+  }, [messages.length, userData, deepSeekService]);
 
   const addMessage = (role: 'user' | 'assistant', content: string) => {
     const message: Message = {
@@ -256,53 +374,97 @@ Click any button below or type your questions - I'll access your real financial 
       const walletKeywords = ['wallet', 'balance', 'money', 'account', 'card', 'cards', 'bank'];
       const isWalletQuery = walletKeywords.some(keyword => userMessage.includes(keyword));
 
+      let contextMessage = input.trim();
+
       if (isWalletQuery && user) {
-        // Check cache first for wallet data (valid for 5 minutes)
-        const now = Date.now();
-        const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-        let cards: any[];
-        let totalBalance: number;
-
-        if (cachedWalletData && (now - cachedWalletData.timestamp) < CACHE_DURATION) {
-          cards = cachedWalletData.cards;
-          totalBalance = cachedWalletData.totalBalance;
-        } else {
-          // Fetch fresh data
-          cards = await cardsService.getByUserId(user.uid);
-          totalBalance = cards.reduce((sum, card) => sum + card.balance, 0);
-
-          // Cache the data
-          setCachedWalletData({
-            cards,
-            totalBalance,
-            timestamp: now
-          });
-        }
-
-        let contextMessage = input.trim(); // Use original message with proper casing
-
-        if (cards.length === 0) {
-          contextMessage += '\n\nNote: The user has no cards in their wallet. They should add some cards to track their finances.';
-        } else {
-          const walletSummary = cards.map(card => ({
+        // Use comprehensive user data
+        if (userData?.cards && userData.cards.length > 0) {
+          const walletSummary = userData.cards.map(card => ({
             name: card.name,
             balance: card.balance,
             type: card.type,
             lastFour: card.lastFour || '****'
           }));
 
-          contextMessage += `\n\nCurrent wallet status: Total balance across ${cards.length} cards: $${totalBalance.toFixed(2)}\n\nCard details: ${JSON.stringify(walletSummary)}`;
+          contextMessage += `\n\nCurrent wallet status: Total balance across ${userData.cards.length} cards: $${userData.totalBalance?.toFixed(2)}\nCard details: ${JSON.stringify(walletSummary)}`;
+
+          const response = await deepSeekService.getFinancialAdvice(contextMessage, {
+            context: 'wallet_query',
+            hasWalletData: true
+          });
+          addMessage('assistant', response);
+        } else {
+          contextMessage += '\n\nNote: The user has no cards in their wallet. They should add some cards to track their finances.';
+
+          const response = await deepSeekService.getFinancialAdvice(contextMessage, {
+            context: 'wallet_query',
+            hasWalletData: false
+          });
+          addMessage('assistant', response);
+        }
+      } else {
+        // Always include comprehensive user context for personalized responses
+        if (userData?.profile) {
+          contextMessage += `\n\nUSER PROFILE: ${JSON.stringify(userData.profile)}`;
+        }
+
+        if (userData?.cards && userData.cards.length > 0) {
+          const walletSummary = userData.cards.map(card => ({
+            name: card.name,
+            balance: card.balance,
+            type: card.type,
+            lastFour: card.lastFour || '****'
+          }));
+          contextMessage += `\n\nCURRENT WALLET: Total balance across ${userData.cards.length} cards: $${userData.totalBalance?.toFixed(2)}\nCard details: ${JSON.stringify(walletSummary)}`;
+        }
+
+        if (userData?.transactions && userData.transactions.length > 0) {
+          const recentTransactions = userData.transactions.slice(0, 10).map(t => ({
+            amount: t.amount,
+            category: t.category,
+            description: t.description,
+            date: t.date,
+            type: t.type
+          }));
+          contextMessage += `\n\nRECENT TRANSACTIONS (last 10): ${JSON.stringify(recentTransactions)}`;
+        }
+
+        if (userData?.expenses && userData.expenses.length > 0) {
+          const recurringExpenses = userData.expenses.map(e => ({
+            name: e.name,
+            amount: e.amount,
+            category: e.category,
+            dayOfMonth: e.dayOfMonth,
+            isActive: e.isActive
+          }));
+          contextMessage += `\n\nRECURRING EXPENSES: ${JSON.stringify(recurringExpenses)}`;
+        }
+
+        if (userData?.income && userData.income.length > 0) {
+          const incomeSources = userData.income.map(i => ({
+            description: i.description,
+            amount: i.amount,
+            date: i.date
+          }));
+          contextMessage += `\n\nINCOME SOURCES: ${JSON.stringify(incomeSources)}`;
+        }
+
+        if (userData?.spendingByCategory) {
+          contextMessage += `\n\nSPENDING BY CATEGORY: ${JSON.stringify(userData.spendingByCategory)}`;
+        }
+
+        if (userData?.monthlyIncome || userData?.monthlyExpenses) {
+          contextMessage += `\n\nMONTHLY SUMMARY: Income: $${userData.monthlyIncome?.toFixed(2)}, Expenses: $${userData.monthlyExpenses?.toFixed(2)}`;
         }
 
         const response = await deepSeekService.getFinancialAdvice(contextMessage, {
-          context: 'wallet_query',
-          hasWalletData: cards.length > 0
+          context: 'general_query',
+          userName: userData?.profile?.displayName || user?.displayName,
+          hasWalletData: !!(userData?.cards && userData.cards.length > 0),
+          hasTransactionData: !!(userData?.transactions && userData.transactions.length > 0),
+          hasExpenseData: !!(userData?.expenses && userData.expenses.length > 0),
+          hasIncomeData: !!(userData?.income && userData.income.length > 0)
         });
-        addMessage('assistant', response);
-      } else {
-        // Regular financial advice for non-wallet queries
-        const response = await deepSeekService.getFinancialAdvice(input.trim());
         addMessage('assistant', response);
       }
     } catch (error) {
@@ -401,6 +563,7 @@ Click any button below or type your questions - I'll access your real financial 
                   <p className="text-slate-200 font-medium">{option.title}</p>
                   <p className="text-slate-400 text-sm mt-1">
                     {option.type === 'wallet' && 'Check your current balances across all cards'}
+                    {option.type === 'transactions' && 'Review your recent financial activity'}
                     {option.type === 'spending' && 'Analyze your spending patterns and habits'}
                     {option.type === 'budget' && 'Get personalized budget recommendations'}
                     {option.type === 'goals' && 'Help with setting and achieving savings goals'}

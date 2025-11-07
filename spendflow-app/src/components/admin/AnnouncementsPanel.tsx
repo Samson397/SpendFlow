@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, Megaphone, Plus, Search, Filter, X, Clock, Users, Globe, AlertTriangle, Check, Calendar, Clock as ClockIcon } from 'lucide-react';
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow } from 'date-fns';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/firebase';
@@ -173,15 +172,13 @@ export default function AnnouncementsPanel() {
   const getAudienceIcon = (audience: string) => {
     switch (audience) {
       case 'all':
-        return <Globe className="h-4 w-4" />;
+        return <span className="text-sm">🌍</span>;
       case 'pro':
-        return <Users className="h-4 w-4" />;
+        return <span className="text-sm">👥</span>;
       case 'enterprise':
-        return <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>;
+        return <span className="text-sm">🏢</span>;
       default:
-        return <Users className="h-4 w-4" />;
+        return <span className="text-sm">👥</span>;
     }
   };
 
@@ -201,7 +198,7 @@ export default function AnnouncementsPanel() {
       case 'warning':
         return (
           <span className={`${baseClasses} bg-amber-900/30 text-amber-400`}>
-            <AlertTriangle className="-ml-0.5 mr-1.5 h-3 w-3" />
+            <span className="text-xs">⚠️</span>
             Warning
           </span>
         );
@@ -263,7 +260,7 @@ export default function AnnouncementsPanel() {
             onClick={() => setShowCreateModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
           >
-            <Plus className="-ml-0.5 mr-1.5 h-4 w-4" />
+            <span className="text-sm">+</span>
             New Announcement
           </button>
         </div>
@@ -272,7 +269,7 @@ export default function AnnouncementsPanel() {
       {/* Announcement List */}
       {announcements.length === 0 ? (
         <div className="text-center py-12">
-          <Megaphone className="mx-auto h-12 w-12 text-slate-500" />
+          <span className="text-4xl">📣</span>
           <h3 className="mt-2 text-sm font-medium text-slate-300">No announcements</h3>
           <p className="mt-1 text-sm text-slate-500">
             Get started by creating a new announcement.
@@ -283,7 +280,7 @@ export default function AnnouncementsPanel() {
               onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
             >
-              <Plus className="-ml-0.5 mr-1.5 h-4 w-4" />
+              <span className="text-sm">+</span>
               New Announcement
             </button>
           </div>
@@ -318,7 +315,7 @@ export default function AnnouncementsPanel() {
                         className="p-1 rounded-md text-slate-400 hover:text-red-400 hover:bg-slate-800"
                         title="Delete announcement"
                       >
-                        <X className="h-4 w-4" />
+                        <span className="text-sm">×</span>
                       </button>
                     </div>
                   </div>
@@ -358,7 +355,7 @@ export default function AnnouncementsPanel() {
                   className="text-slate-400 hover:text-slate-300"
                   onClick={() => setShowCreateModal(false)}
                 >
-                  <X className="h-5 w-5" />
+                  <span className="text-lg">×</span>
                 </button>
               </div>
               

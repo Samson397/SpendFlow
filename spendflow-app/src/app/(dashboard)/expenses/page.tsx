@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { TrendingDown, Plus, CreditCard, Calendar, Edit2, Trash2 } from 'lucide-react';
 import { cardsService } from '@/lib/firebase/firestore';
 import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
 import { RecurringExpense } from '@/types/recurring';
@@ -141,7 +140,7 @@ function ExpensesPageContent() {
           <div className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-md w-full p-6 sm:p-8 text-center">
             <div className="mb-6">
               <div className="w-16 h-16 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="h-8 w-8 text-amber-400" />
+                <span className="text-2xl">💳</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-serif text-slate-100 mb-2 tracking-wide">
                 No Cards Found
@@ -185,7 +184,7 @@ function ExpensesPageContent() {
           onClick={handleAddExpenseClick}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
         >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="text-lg">+</span>
           Add Expense
         </button>
       </div>
@@ -196,7 +195,7 @@ function ExpensesPageContent() {
           <div className="text-amber-400/60 text-xs tracking-widest uppercase mb-3 sm:mb-4 font-serif">Total Expenses</div>
           <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-slate-100 mb-2">{formatAmount(totalExpenses)}</div>
           <div className="flex items-center justify-center gap-2 text-slate-500">
-            <TrendingDown className="h-4 w-4" />
+            <span className="text-sm">📉</span>
             <span className="text-sm tracking-wider">{expenses.length} Recurring Expenses</span>
           </div>
         </div>
@@ -225,7 +224,7 @@ function ExpensesPageContent() {
                         <span className="uppercase">{expense.category}</span>
                         <span className="hidden sm:inline">•</span>
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                          <span className="text-xs">📅</span>
                           <span>Day {expense.dayOfMonth} of month</span>
                         </div>
                         {!expense.isActive && (
@@ -247,14 +246,14 @@ function ExpensesPageContent() {
                         className="p-1.5 sm:p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/50 rounded transition-colors touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
                         title="Edit expense"
                       >
-                        <Edit2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="text-sm">✏️</span>
                       </button>
                       <button
                         onClick={() => handleDeleteExpense(expense.id, expense.name)}
                         className="p-1.5 sm:p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800/50 rounded transition-colors touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
                         title="Delete expense"
                       >
-                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="text-sm">🗑️</span>
                       </button>
                     </div>
                   </div>

@@ -105,11 +105,11 @@ export default function SettingsPanel() {
   };
 
   const tabs = [
-    { id: 'general', label: 'General', icon: <Settings className="h-4 w-4" /> },
-    { id: 'security', label: 'Security', icon: <Shield className="h-4 w-4" /> },
-    { id: 'notifications', label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
-    { id: 'email', label: 'Email', icon: <Mail className="h-4 w-4" /> },
-    { id: 'backup', label: 'Backup & Restore', icon: <Database className="h-4 w-4" /> },
+    { id: 'general', label: 'General', icon: <span className="text-sm">⚙️</span> },
+    { id: 'security', label: 'Security', icon: <span className="text-sm">🛡️</span> },
+    { id: 'notifications', label: 'Notifications', icon: <span className="text-sm">🔔</span> },
+    { id: 'email', label: 'Email', icon: <span className="text-sm">📧</span> },
+    { id: 'backup', label: 'Backup & Restore', icon: <span className="text-sm">💾</span> },
   ];
 
   return (
@@ -123,7 +123,7 @@ export default function SettingsPanel() {
         >
           {isSaving ? 'Saving...' : (
             <>
-              <Save className="-ml-1 mr-2 h-4 w-4" />
+              <span className="text-sm">💾</span>
               Save Changes
             </>
           )}
@@ -399,7 +399,7 @@ export default function SettingsPanel() {
                   type="button"
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
-                  <Database className="-ml-1 mr-2 h-4 w-4" />
+                  <span className="text-sm">🗄️</span>
                   Create Manual Backup
                 </button>
               </div>

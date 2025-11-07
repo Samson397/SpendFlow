@@ -3,7 +3,11 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { DeepSeekInitializer } from '@/components/DeepSeekInitializer';
+import { ConsentManager } from '@/components/consent/ConsentManager';
 
 // Import DeepSeek service for AI features
 import { validateEnvironment } from '@/lib/env-validation';
@@ -20,6 +24,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'SpendFlow - Smart Financial Management',
   description: 'Take control of your finances with SpendFlow. Track expenses, manage cards, and gain insights into your spending habits.',
+  keywords: 'finance, expense tracker, budget, money management, cards',
   applicationName: 'SpendFlow',
   authors: [{ name: 'SpendFlow Team' }],
   creator: 'SpendFlow',
@@ -40,24 +45,32 @@ export const metadata: Metadata = {
     'mobile-web-app-capable': 'yes',
     'msapplication-TileColor': '#0f172a',
     'msapplication-config': '/browserconfig.xml',
+    'msapplication-TileImage': '/icon-192.png',
     'theme-color': '#f59e0b',
+    'color-scheme': 'dark light',
   },
   icons: {
     icon: [
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icon-96.png', sizes: '96x96', type: 'image/png' },
-      { url: '/icon-128.png', sizes: '128x128', type: 'image/png' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-256.png', sizes: '256x256', type: 'image/png' },
       { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon-256.png', sizes: '256x256', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-128.png', sizes: '128x128', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icon-96.png', sizes: '96x96', type: 'image/png' },
       { url: '/logo-main.png', sizes: 'any', type: 'image/png' },
     ],
     shortcut: [
       { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    other: [
+      { rel: 'icon', url: '/favicon.ico' },
+      { rel: 'icon', url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
     ],
   },
 };
@@ -79,14 +92,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full bg-slate-900 text-slate-100">
-        <AuthProvider>
-          <CurrencyProvider>
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
-          </CurrencyProvider>
-        </AuthProvider>
+      <body className="h-full" style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-primary)' }}>
+        <ThemeProvider>
+          <SubscriptionProvider>
+            <AuthProvider>
+              <CurrencyProvider>
+                <DeepSeekInitializer />
+                <ConsentManager />
+                <ErrorBoundary>
+                  {children}
+                </ErrorBoundary>
+              </CurrencyProvider>
+            </AuthProvider>
+          </SubscriptionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

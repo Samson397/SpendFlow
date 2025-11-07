@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { alertsService } from '@/lib/alerts';
 import { getFirebaseAuthError } from '@/lib/utils/firebaseAuthErrors';
+import { GeolocationService } from '@/lib/services/geolocationService';
 import Image from 'next/image';
 
 function SignupContent() {
@@ -22,8 +23,27 @@ function SignupContent() {
   const [verificationSent, setVerificationSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [registrationEnabled, setRegistrationEnabled] = useState(true); // Default to enabled
+  const [detectedCurrency, setDetectedCurrency] = useState('USD');
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+
+  // Detect user location and set currency on component mount
+  useEffect(() => {
+    const detectLocation = async () => {
+      try {
+        const locationData = await GeolocationService.getUserLocation();
+        if (locationData?.currency) {
+          setDetectedCurrency(locationData.currency);
+          console.log(`Detected location: ${locationData.country_name}, Currency: ${locationData.currency}`);
+        }
+      } catch (error) {
+        console.error('Error detecting location:', error);
+        // Keep default USD if detection fails
+      }
+    };
+
+    detectLocation();
+  }, []);
 
   // Check if registration is enabled
   useEffect(() => {
@@ -70,12 +90,12 @@ function SignupContent() {
 
   const handleResendVerification = async () => {
     if (resendCooldown > 0) return;
-    
+
     try {
       const user = auth.currentUser;
       if (user) {
         await sendEmailVerification(user, {
-          url: `${window.location.origin}/dashboard?verified=true`,
+          url: `${window.location.origin}/verify-email`,
         });
         setResendCooldown(60); // 60 seconds cooldown
         setError('');
@@ -108,10 +128,30 @@ function SignupContent() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Send verification email
+      // Send verification email using Firebase (required for oobCode verification)
       await sendEmailVerification(user, {
-        url: `${window.location.origin}/dashboard?verified=true`,
+        url: `${window.location.origin}/verify-email`,
       });
+
+      // Also send our custom confirmation email for additional branding/follow-up
+      const confirmationLink = `${window.location.origin}/verify-email`;
+      try {
+        await fetch('/api/email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'send_email_confirmation',
+            userEmail: email,
+            userName: name,
+            confirmationLink: confirmationLink
+          })
+        });
+      } catch (emailError) {
+        console.warn('Failed to send custom confirmation email:', emailError);
+        // Continue with signup even if custom email fails
+      }
       
       // Update user profile with display name
       await updateProfile(user, {
@@ -127,14 +167,16 @@ function SignupContent() {
         photoURL: user.photoURL || '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        currency: 'USD', // Default currency
+        currency: detectedCurrency, // Use detected currency instead of hardcoded USD
       });
       
       // Generate alert for new user registration
       try {
         await alertsService.userRegistered(user.uid, user.email || 'Unknown', 'free');
+        // Send welcome email
+        await alertsService.sendWelcomeEmail(user.uid, user.email || '', name);
       } catch (alertError) {
-        console.warn('Failed to create registration alert:', alertError);
+        console.warn('Failed to create registration alert or send welcome email:', alertError);
         // Don't fail registration if alert creation fails
       }
 
@@ -167,7 +209,7 @@ function SignupContent() {
         email: user.email,
         photoURL: user.photoURL || '',
         createdAt: new Date().toISOString(),
-        currency: 'USD', // Default currency
+        currency: detectedCurrency, // Use detected currency
       }, { merge: true });
       
       // Generate alert for new user registration via Google

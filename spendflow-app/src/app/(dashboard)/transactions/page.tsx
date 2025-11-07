@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { Plus, TrendingUp, TrendingDown, CreditCard, Award } from 'lucide-react';
-import { transactionsService, cardsService } from '@/lib/firebase/firestore';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useCards } from '@/hooks/useCards';
+import { transactionsService } from '@/lib/firebase/firestore';
 import { Transaction } from '@/types';
 import { format } from 'date-fns';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
@@ -18,27 +19,25 @@ function TransactionsPageContent() {
   const { user } = useAuth();
   const { formatAmount } = useCurrency();
   const { canAddTransaction } = useAccessControl();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Real-time data hooks
+  const { transactions, loading: transactionsLoading } = useTransactions(user?.uid, { limit: 100 });
+  const { cards, loading: cardsLoading } = useCards(user?.uid);
+
   const [filterType, setFilterType] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [hasCards, setHasCards] = useState(false);
   const [showNoCardsMessage, setShowNoCardsMessage] = useState(false);
-  const [largestTransaction, setLargestTransaction] = useState<number | null>(null);
 
-  const handleTransactionClick = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setShowEditModal(true);
-  };
+  const loading = transactionsLoading || cardsLoading;
+  const hasCards = cards.length > 0;
 
   const handleAddTransactionClick = async () => {
     if (!user) return;
 
     try {
-      const cards = await cardsService.getByUserId(user.uid);
-      if (cards.length === 0) {
+      if (!hasCards) {
         setShowNoCardsMessage(true);
         return;
       }
@@ -68,57 +67,16 @@ function TransactionsPageContent() {
 
       setShowModal(true);
     } catch (error) {
-      console.error('Error checking cards or access:', error);
+      console.error('Error checking access:', error);
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      loadData();
-      checkCards();
-
-      // Add window focus listener to re-check cards when returning to page
-      const handleFocus = () => {
-        checkCards();
-      };
-      window.addEventListener('focus', handleFocus);
-
-      return () => {
-        window.removeEventListener('focus', handleFocus);
-      };
-    }
-    return () => {}; // Return empty cleanup function when no user
-  }, [user]);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const transactionsData = await transactionsService.getRecentByUserId(user!.uid, 100);
-      setTransactions(transactionsData);
-
-      // Calculate largest transaction
-      if (transactionsData.length > 0) {
-        const maxAmount = Math.max(...transactionsData.map(t => t.amount));
-        setLargestTransaction(maxAmount);
-      } else {
-        setLargestTransaction(null);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowEditModal(true);
   };
 
-  const checkCards = async () => {
-    try {
-      const cards = await cardsService.getByUserId(user!.uid);
-      setHasCards(cards.length > 0);
-    } catch (error) {
-      console.error('Error checking cards:', error);
-    }
-  };
-
+  // Reactive calculations
   const filteredTransactions = transactions.filter(t => {
     if (filterType === 'all') return true;
     return t.type === filterType;
@@ -132,6 +90,10 @@ function TransactionsPageContent() {
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const largestTransaction = transactions.length > 0
+    ? Math.max(...transactions.map(t => t.amount))
+    : null;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -141,7 +103,7 @@ function TransactionsPageContent() {
   }
 
   const handleSuccess = () => {
-    loadData();
+    // Data updates automatically through real-time hooks
   };
 
   return (
@@ -170,7 +132,7 @@ function TransactionsPageContent() {
           <div className="bg-slate-950 border border-amber-700/30 rounded-lg shadow-2xl max-w-md w-full p-8 text-center">
             <div className="mb-6">
               <div className="w-16 h-16 bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="h-8 w-8 text-amber-400" />
+                <span className="text-2xl">💳</span>
               </div>
               <h3 className="text-2xl font-serif text-slate-100 mb-2 tracking-wide">
                 No Cards Found
@@ -190,7 +152,7 @@ function TransactionsPageContent() {
       )}
 
       {/* Header */}
-      <div className="text-center sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md py-4 -mx-4 px-4 border-b border-slate-800 md:bg-transparent md:backdrop-blur-none md:border-0 md:py-0 md:static">
+      <div className="text-center mb-8">
         <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4 md:mb-8"></div>
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif text-slate-100 mb-2 md:mb-4 tracking-wide">
           <span className="md:hidden">TRANSACTIONS</span>
@@ -205,7 +167,7 @@ function TransactionsPageContent() {
         <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 md:p-8 backdrop-blur-sm">
           <div className="border-l-2 border-amber-600 pl-4 sm:pl-6">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+              <span className="text-lg">📈</span>
               <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Total Income</div>
             </div>
             <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{formatAmount(totalIncome)}</div>
@@ -215,7 +177,7 @@ function TransactionsPageContent() {
         <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 md:p-8 backdrop-blur-sm">
           <div className="border-l-2 border-amber-600 pl-4 sm:pl-6">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+              <span className="text-lg">📉</span>
               <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Total Expenses</div>
             </div>
             <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{formatAmount(totalExpenses)}</div>
@@ -225,7 +187,7 @@ function TransactionsPageContent() {
         <div className="border border-slate-800 bg-slate-900/50 p-4 sm:p-6 md:p-8 backdrop-blur-sm">
           <div className="border-l-2 border-amber-600 pl-4 sm:pl-6">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <Award className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+              <span className="text-lg">🏆</span>
               <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Largest Transaction</div>
             </div>
             <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{largestTransaction ? formatAmount(largestTransaction) : 'N/A'}</div>
@@ -253,7 +215,7 @@ function TransactionsPageContent() {
           onClick={handleAddTransactionClick}
           className="flex items-center gap-2 px-4 py-2 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
         >
-          <Plus className="h-4 w-4" />
+          <span className="text-lg">+</span>
           <span className="hidden sm:inline">Add Transaction</span>
           <span className="sm:hidden">Add</span>
         </button>
@@ -312,7 +274,7 @@ function TransactionsPageContent() {
                           if (window.confirm('Are you sure you want to delete this transaction?')) {
                             try {
                               await transactionsService.delete(transaction.id!);
-                              loadData();
+                              // Data will update automatically through real-time hooks
                             } catch (error) {
                               console.error('Error deleting transaction:', error);
                             }
