@@ -48,7 +48,7 @@ export default function Home() {
               </div>
 
               {/* Decorative Line */}
-              <div className="w-16 sm:w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
+              <div className="w-16 sm:w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
               
               {/* Headline */}
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100 mb-3 tracking-tight leading-tight">
@@ -56,7 +56,7 @@ export default function Home() {
               </h1>
 
               {/* Decorative Line */}
-              <div className="w-20 sm:w-24 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto my-4"></div>
+              <div className="w-20 sm:w-24 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto my-4"></div>
               
               {/* Description */}
               <p className="text-sm sm:text-base text-slate-400 mb-6 max-w-2xl mx-auto leading-relaxed">
@@ -180,9 +180,9 @@ export default function Home() {
         </section>
 
         {/* Final CTA Section */}
-        <section className="py-12 sm:py-16 bg-gradient-to-br from-slate-900 to-slate-800">
+        <section className="py-12 sm:py-16 bg-linear-to-br from-slate-900 to-slate-800">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-            <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
+            <div className="w-16 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto mb-6"></div>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100 mb-4">
               Ready to Take Control?
             </h2>
