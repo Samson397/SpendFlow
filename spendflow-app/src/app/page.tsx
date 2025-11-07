@@ -222,11 +222,6 @@ export default function Home() {
                     About Us
                   </Link>
                 </li>
-                <li>
-                  <Link href="/contact" className="text-slate-400 hover:text-amber-400 transition-colors">
-                    Contact
-                  </Link>
-                </li>
               </ul>
             </div>
 
