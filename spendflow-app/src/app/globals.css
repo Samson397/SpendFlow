@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+/* Loading Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
 /* Theme CSS Variables */
 :root {
   /* Default theme colors - will be overridden by ThemeProvider */

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon, CpuChipIcon, BoltIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, CreditCardIcon, CurrencyDollarIcon, UserIcon, ShieldCheckIcon, ArrowLeftOnRectangleIcon, BanknotesIcon, ReceiptPercentIcon, Bars3Icon, XMarkIcon, CalendarIcon, BuildingLibraryIcon, SparklesIcon, TagIcon, CpuChipIcon, BoltIcon, ChatBubbleLeftRightIcon, CursorArrowRaysIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/firebase/config';
@@ -27,6 +27,7 @@ const userNavigation: NavItem[] = [
   { name: 'Income', href: '/income', icon: BanknotesIcon },
   { name: 'Cards', href: '/cards', icon: CreditCardIcon },
   { name: 'Savings', href: '/savings', icon: BuildingLibraryIcon },
+  { name: 'Budgets', href: '/budgets', icon: CursorArrowRaysIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
   { name: 'AI Assistant', href: '/ai', icon: BoltIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
@@ -220,7 +221,7 @@ export default function Sidebar() {
               className="rounded"
             />
             <h1 className="text-lg font-serif text-slate-100 tracking-widest">
-              SPENDFLOW
+              Welcome, {user?.displayName || user?.email?.split('@')[0] || 'User'}
             </h1>
           </div>
           <button

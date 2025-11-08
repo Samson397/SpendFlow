@@ -585,7 +585,7 @@ export default function UserManagement() {
                           <p className="text-slate-200">
                             {selectedUser.createdAt 
                               ? new Date(selectedUser.createdAt).toLocaleDateString() 
-                              : 'N/A'}
+                              : 'Unknown'}
                           </p>
                         </div>
                         <div>

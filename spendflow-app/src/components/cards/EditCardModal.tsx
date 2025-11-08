@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import * as Lucide from 'lucide-react';
 import { cardsService } from '@/lib/firebase/firestore';
 import { Card } from '@/types';
 import toast from 'react-hot-toast';
@@ -98,7 +98,9 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
         updateData.paymentDueDay = Number(formData.paymentDueDay);
         updateData.paymentDebitCardId = formData.paymentSourceCardId || undefined;
         updateData.autoPayEnabled = formData.autoPayEnabled;
-        updateData.minimumPayment = Number(formData.minimumPayment) || undefined;
+        // Only include minimumPayment if it's a valid number
+        const minPayment = Number(formData.minimumPayment);
+        updateData.minimumPayment = !isNaN(minPayment) ? minPayment : undefined;
       }
 
       await cardsService.update(card.id, updateData);
@@ -138,8 +140,7 @@ export function EditCardModal({ card, isOpen, onClose, onSuccess }: EditCardModa
             onClick={onClose}
             className="text-slate-400 hover:text-slate-100 transition-colors"
           >
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <X className="h-6 w-6" />
+            <Lucide.X className="h-6 w-6" />
           </button>
         </div>
 

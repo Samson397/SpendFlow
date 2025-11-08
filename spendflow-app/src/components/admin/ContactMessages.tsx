@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { format } from 'date-fns';
-import { Mail, Check, Clock, Search, Filter, ChevronDown, ChevronUp, Trash2, Archive, Tag, MoreVertical, Reply, Send, X } from 'lucide-react';
+import * as Lucide from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export interface ContactMessage {
@@ -189,8 +189,7 @@ export default function ContactMessages() {
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:min-w-[300px]">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-              <Search className="h-4 w-4 text-slate-500" />
+              <Lucide.Search className="h-4 w-4 text-slate-500" />
             </div>
             <input
               type="text"
@@ -204,8 +203,7 @@ export default function ContactMessages() {
             onClick={() => setShowFilters(!showFilters)}
             className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
           >
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <Filter className="h-4 w-4" />
+            <Lucide.Filter className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -235,16 +233,14 @@ export default function ContactMessages() {
                   onClick={() => updateMultipleMessagesStatus('read')}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors flex items-center gap-1"
                 >
-                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                  <Check className="h-3.5 w-3.5" />
+                  <Lucide.Check className="h-3.5 w-3.5" />
                   <span>Mark as Read</span>
                 </button>
                 <button
                   onClick={() => updateMultipleMessagesStatus('archived')}
                   className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-md transition-colors flex items-center gap-1"
                 >
-                  {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                  <Archive className="h-3.5 w-3.5" />
+                  <Lucide.Archive className="h-3.5 w-3.5" />
                   <span>Archive</span>
                 </button>
               </div>
@@ -257,8 +253,7 @@ export default function ContactMessages() {
       <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
         {filteredMessages.length === 0 ? (
           <div className="text-center py-12">
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <Mail className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+            <Lucide.Mail className="h-12 w-12 text-slate-600 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-300">No messages found</h3>
             <p className="mt-1 text-sm text-slate-500">
               {statusFilter === 'all' ? 'You don\'t have any messages yet.' : `No ${statusFilter} messages found.`}
@@ -311,7 +306,7 @@ export default function ContactMessages() {
                     <div className="text-xs text-slate-500 truncate">{message.message.substring(0, 60)}...</div>
                   </div>
                   <div className="col-span-2 text-xs text-slate-400">
-                    {message.createdAt ? format(message.createdAt, 'MMM d, yyyy') : 'N/A'}
+                    {message.createdAt ? format(message.createdAt, 'MMM d, yyyy') : 'Unknown date'}
                   </div>
                   <div className="col-span-1 flex justify-end items-center gap-2">
                     {getStatusBadge(message.status)}
@@ -323,8 +318,7 @@ export default function ContactMessages() {
                       className="p-1 text-slate-500 hover:text-amber-400 transition-colors"
                       title="Reply to message"
                     >
-                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                      <Reply className="h-4 w-4" />
+                      <Lucide.Reply className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -359,8 +353,7 @@ export default function ContactMessages() {
                             <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
                           ) : (
                             <>
-                              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                              <Send className="h-3 w-3" />
+                              <Lucide.Send className="h-3 w-3" />
                               Send
                             </>
                           )}
@@ -373,8 +366,7 @@ export default function ContactMessages() {
                           disabled={sendingReply}
                           className="px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-800 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors flex items-center gap-1"
                         >
-                          {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                          <X className="h-3 w-3" />
+                          <Lucide.X className="h-3 w-3" />
                           Cancel
                         </button>
                       </div>

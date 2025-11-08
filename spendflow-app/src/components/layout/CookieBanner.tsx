@@ -20,6 +20,7 @@ export default function CookieBanner() {
         return () => clearTimeout(timer);
       }
     }
+    return undefined;
   }, []);
 
   const acceptCookies = () => {

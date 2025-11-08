@@ -250,6 +250,10 @@ export function AdvancedAnalytics() {
     );
   }
 
+  if (!analytics) {
+    return null; // This should not happen due to the earlier checks, but TypeScript needs it
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with time range selector */}

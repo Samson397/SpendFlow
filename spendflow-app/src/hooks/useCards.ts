@@ -47,6 +47,8 @@ export function useCards(userId: string | undefined, options?: {
       // One-time fetch
       fetchCards();
     }
+
+    return undefined;
   }, [userId, options?.realtime, fetchCards]);
 
   const refresh = useCallback(() => {

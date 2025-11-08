@@ -1,13 +1,10 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { X, CreditCard } from 'lucide-react';
-import { cardsService } from '@/lib/firebase/firestore';
+import * as Lucide from 'lucide-react';
+import { usersService, cardsService } from '@/lib/firebase/firestore';
+import { UserProfile } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import toast from 'react-hot-toast';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/firebase/config';
 
 interface AddCardModalProps {
   isOpen: boolean;
@@ -20,8 +17,10 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
   const { currency } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [debitCards, setDebitCards] = useState<Array<{id: string, name: string, lastFour: string}>>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState<{
     name: string;
+    cardHolder: string;
     type: 'debit' | 'credit';
     lastFour: string;
     expiryDate: string;
@@ -36,6 +35,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
     minimumPayment: string;
   }>({
     name: '',
+    cardHolder: user?.displayName || (user?.email ? user.email.split('@')[0] : '') || 'Your Name', // Auto-populate with best available name
     type: 'debit' as 'debit' | 'credit',
     lastFour: '',
     expiryDate: '',
@@ -52,41 +52,46 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
 
   if (!isOpen) return null;
 
-  // Fetch debit cards when modal opens
+  // Fetch user profile when modal opens
   useEffect(() => {
     if (isOpen && user) {
-      const fetchDebitCards = async () => {
+      const fetchUserProfile = async () => {
         try {
-          const cardsQuery = query(collection(db, 'cards'), 
-            where('userId', '==', user.uid),
-            where('type', '==', 'debit')
-          );
-          const cardsSnapshot = await getDocs(cardsQuery);
-          const debitCardsData = cardsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            name: doc.data().name || 'Unnamed Card',
-            lastFour: doc.data().lastFour || '****'
-          }));
-          setDebitCards(debitCardsData);
+          const profile = await usersService.get(user.uid);
+          setUserProfile(profile);
         } catch (error) {
-          console.error('Error fetching debit cards:', error);
+          console.error('Error fetching user profile:', error);
         }
       };
-      fetchDebitCards();
+      fetchUserProfile();
+    }
+  }, [isOpen, user]);
+
+  // Update cardHolder when userProfile loads
+  useEffect(() => {
+    if (userProfile) {
+      const cardHolderName = userProfile.displayName || userProfile.email?.split('@')[0] || user?.displayName || (user?.email ? user.email.split('@')[0] : '') || 'Your Name';
+      console.log('Updating card holder from profile:', { profileName: userProfile.displayName, profileEmail: userProfile.email, finalName: cardHolderName });
+      setFormData(prev => ({ ...prev, cardHolder: cardHolderName }));
+    }
+  }, [userProfile, user]);
+
+  // Debug user info on modal open
+  useEffect(() => {
+    if (isOpen && user) {
+      console.log('User info on modal open:', {
+        displayName: user.displayName,
+        email: user.email,
+        uid: user.uid
+      });
     }
   }, [isOpen, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) {
-      toast.error('You must be logged in to add cards');
-      return;
-    }
-
-    // Basic validation
-    if (!formData.name.trim()) {
-      toast.error('Please enter a card name');
+    if (!formData.cardHolder.trim()) {
+      toast.error('Please enter the card holder name');
       return;
     }
 
@@ -161,12 +166,12 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         return;
       }
 
-      await cardsService.create({
+      const cardData = {
         userId: user.uid,
         name: formData.name,
+        cardHolder: formData.cardHolder,
         lastFour: formData.lastFour,
-        cardNumber: `****${formData.lastFour}`,
-        cardHolder: user.displayName || user.email?.split('@')[0] || 'Card Holder',
+        cardNumber: `**** **** **** ${formData.lastFour}`,
         expiryDate: formData.expiryDate,
         cvv: '***',
         balance: parseFloat(formData.balance) || 0,
@@ -186,7 +191,9 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
           autoPayEnabled: formData.autoPayEnabled,
           minimumPayment: formData.minimumPayment ? parseFloat(formData.minimumPayment) : undefined,
         }),
-      });
+      };
+
+      await cardsService.create(cardData);
 
       onSuccess();
       onClose();
@@ -196,6 +203,7 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
       // Reset form
       setFormData({
         name: '',
+        cardHolder: '',
         lastFour: '',
         expiryDate: '',
         balance: '',
@@ -223,33 +231,31 @@ export function AddCardModal({ isOpen, onClose, onSuccess }: AddCardModalProps) 
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <CreditCard className="h-6 w-6 text-amber-400" />
+            <Lucide.CreditCard className="h-6 w-6 text-amber-400" />
             <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Add New Card</h2>
           </div>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <X className="h-6 w-6" />
+            <Lucide.X className="h-6 w-6" />
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Card Name */}
+          {/* Card Holder Name */}
           <div>
-            <label htmlFor="card-name" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
-              Card Name
+            <label htmlFor="card-holder" className="block text-slate-400 text-xs tracking-widest uppercase mb-2 font-serif">
+              Card Holder Name
             </label>
             <input
-              id="card-name"
+              id="card-holder"
               type="text"
               required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Chase Sapphire"
+              value={formData.cardHolder}
+              onChange={(e) => setFormData({ ...formData, cardHolder: e.target.value })}
+              placeholder={user?.displayName || user?.email?.split('@')[0] || "Enter your full name"}
               className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 text-slate-100 rounded focus:border-amber-600 focus:outline-none transition-colors font-serif"
             />
           </div>

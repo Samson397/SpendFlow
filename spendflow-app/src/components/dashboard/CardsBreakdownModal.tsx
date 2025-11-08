@@ -9,6 +9,8 @@ interface Card {
   balance: number;
   lastFour?: string;
   cardHolder?: string;
+  limit?: number;
+  creditLimit?: number;
 }
 
 interface CardsBreakdownModalProps {
@@ -24,7 +26,16 @@ export function CardsBreakdownModal({ isOpen, onClose, cards, type }: CardsBreak
   if (!isOpen) return null;
 
   const filteredCards = cards.filter(card => card.type === type);
-  const totalBalance = filteredCards.reduce((sum, card) => sum + card.balance, 0);
+  const totalBalance = filteredCards.reduce((sum, card) => {
+    // For credit cards: show available credit (limit - balance)
+    // For debit cards: show balance
+    if (type === 'credit') {
+      const limit = card.limit || card.creditLimit || 0;
+      return sum + (limit - card.balance);
+    } else {
+      return sum + card.balance;
+    }
+  }, 0);
   const title = type === 'credit' ? 'Credit Cards' : 'Debit Cards';
 
   return (
@@ -96,7 +107,14 @@ export function CardsBreakdownModal({ isOpen, onClose, cards, type }: CardsBreak
                     <div className={`text-2xl font-serif ${
                       type === 'credit' ? 'text-blue-400' : 'text-green-400'
                     }`}>
-                      {formatAmount(card.balance)}
+                      {(() => {
+                        if (type === 'credit') {
+                          const limit = card.limit || card.creditLimit || 0;
+                          return formatAmount(limit - card.balance);
+                        } else {
+                          return formatAmount(card.balance);
+                        }
+                      })()}
                     </div>
                   </div>
                 </div>

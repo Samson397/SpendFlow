@@ -25,7 +25,7 @@ export function useCategories(userId: string | undefined, type?: 'income' | 'exp
       }
 
       // Filter by user if needed (global categories might be shared)
-      const userCategories = data.filter(cat => !cat.userId || cat.userId === userId);
+      const userCategories = data; // Categories are global
       setCategories(userCategories);
     } catch (err) {
       console.error('Error fetching categories:', err);
@@ -44,7 +44,7 @@ export function useCategories(userId: string | undefined, type?: 'income' | 'exp
       const unsubscribe = categoriesService.subscribe(
         (data: Category[]) => {
           // Filter by user if needed
-          const userCategories = data.filter(cat => !cat.userId || cat.userId === userId);
+          const userCategories = data; // Categories are global
           setCategories(userCategories);
           setLoading(false);
           setError(null);
@@ -57,6 +57,8 @@ export function useCategories(userId: string | undefined, type?: 'income' | 'exp
       // One-time fetch
       fetchCategories();
     }
+
+    return undefined;
   }, [userId, type, options?.realtime, fetchCategories]);
 
   const refresh = useCallback(() => {

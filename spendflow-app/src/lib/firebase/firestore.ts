@@ -240,6 +240,61 @@ export const cardsService = {
       balance: amount,
       updatedAt: new Date()
     });
+  },
+
+  // Remove duplicate cards (keeps the most recent one)
+  async removeDuplicateCards(userId: string): Promise<{removed: number, kept: number}> {
+    // Use the base service method to avoid circular reference
+    const q = query(
+      collection(db, 'cards'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    const allCards = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate()
+    } as Card));
+    
+    // Group cards by lastFour
+    const cardsByLastFour: Record<string, Card[]> = {};
+    allCards.forEach((card: Card) => {
+      if (card.lastFour) {
+        if (!cardsByLastFour[card.lastFour]) {
+          cardsByLastFour[card.lastFour] = [];
+        }
+        cardsByLastFour[card.lastFour].push(card);
+      }
+    });
+    
+    let removedCount = 0;
+    let keptCount = 0;
+    
+    // For each group with duplicates, keep the most recent one and delete the rest
+    for (const [lastFour, cards] of Object.entries(cardsByLastFour)) {
+      if (cards.length > 1) {
+        // Sort by creation date (newest first)
+        cards.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        
+        // Keep the first one (most recent), delete the rest
+        const [keep, ...duplicates] = cards;
+        keptCount++;
+        
+        // Delete duplicates
+        for (const duplicate of duplicates) {
+          await this.delete(duplicate.id);
+          removedCount++;
+        }
+        
+        console.log(`Cleaned up ${duplicates.length} duplicates for ****${lastFour}, kept most recent card: ${keep.name || 'Unnamed'}`);
+      } else {
+        keptCount++;
+      }
+    }
+    
+    return { removed: removedCount, kept: keptCount };
   }
 };
 

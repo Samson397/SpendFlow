@@ -75,7 +75,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                 {transaction.card && (
                   <>
                     <span>•</span>
-                    <span>•••• {transaction.card.cardNumber?.slice(-4) || 'N/A'}</span>
+                    <span>•••• {transaction.card.cardNumber?.slice(-4) || '****'}</span>
                   </>
                 )}
               </div>

@@ -160,6 +160,7 @@ export function UserAdminMessaging({ isOpen, onClose }: { isOpen: boolean; onClo
       const timer = setTimeout(() => setShowWelcome(false), 3000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isOpen]);
 
   // Scroll to bottom when new messages arrive

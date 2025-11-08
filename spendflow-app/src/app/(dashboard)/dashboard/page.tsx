@@ -5,11 +5,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
-import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
-import { AuthGate } from '@/components/auth/AuthGate';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCards } from '@/hooks/useCards';
+import { CreateBudgetModal } from '@/components/budgets/CreateBudgetModal';
+import { BudgetCard } from '@/components/budgets/BudgetCard';
+import { BudgetService } from '@/lib/services/budgetService';
+import { Budget } from '@/types/budget';
+import { DashboardAnalytics } from '@/components/analytics/DashboardAnalytics';
+import { AuthGate } from '@/components/auth/AuthGate';
+import { SwipeableTransactionCard } from '@/components/transactions/SwipeableTransactionCard';
+import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
+import { recurringExpensesService } from '@/lib/firebase/recurringExpenses';
+import { RecurringExpense } from '@/types/recurring';
+import { CardsBreakdownModal } from '@/components/dashboard/CardsBreakdownModal';
+import * as Lucide from 'lucide-react';
+import { savingsAccountsService } from '@/lib/services/savingsService';
 
 function DashboardContent() {
   const { user } = useAuth();
@@ -21,33 +31,122 @@ function DashboardContent() {
   const { transactions, loading: transactionsLoading } = useTransactions(user?.uid, { limit: 50 });
   const { cards, loading: cardsLoading } = useCards(user?.uid);
 
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [recurringExpensesLoading, setRecurringExpensesLoading] = useState(true);
+  const [savingsAccounts, setSavingsAccounts] = useState<Array<{ id: string; balance: number; name: string }>>([]);
+  const [savingsAccountsLoading, setSavingsAccountsLoading] = useState(true);
+
   // Check if user is admin
   const adminEmails = process.env['NEXT_PUBLIC_ADMIN_EMAILS']?.split(',') || [];
   const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
   const [showCardsModal, setShowCardsModal] = useState(false);
   const [selectedCardType, setSelectedCardType] = useState<'credit' | 'debit'>('credit');
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [savingsAccounts] = useState<Array<{ id: string; balance: number; name: string }>>([]);
+  const [defaultTransactionType, setDefaultTransactionType] = useState<'income' | 'expense'>('expense');
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const hasCards = cards.length > 0;
-  const loading = transactionsLoading || cardsLoading;
+  const loading = transactionsLoading || cardsLoading || recurringExpensesLoading || savingsAccountsLoading;
 
-  // Calculate upcoming expenses for next 2-3 days
+  // Load recurring expenses
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const loadRecurringExpenses = async () => {
+      try {
+        setRecurringExpensesLoading(true);
+        const expenses = await recurringExpensesService.getByUserId(user.uid);
+        setRecurringExpenses(expenses);
+      } catch (error) {
+        console.error('Error loading recurring expenses:', error);
+      } finally {
+        setRecurringExpensesLoading(false);
+      }
+    };
+
+    loadRecurringExpenses();
+  }, [user?.uid]);
+
+  // Load savings accounts
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const loadSavingsAccounts = async () => {
+      try {
+        setSavingsAccountsLoading(true);
+        const accounts = await savingsAccountsService.getUserAccounts(user.uid);
+        setSavingsAccounts(accounts.map(account => ({
+          id: account.id,
+          balance: account.balance,
+          name: account.name,
+        })));
+      } catch (error) {
+        console.error('Error loading savings accounts:', error);
+      } finally {
+        setSavingsAccountsLoading(false);
+      }
+    };
+
+    loadSavingsAccounts();
+  }, [user?.uid]);
+
+  // Calculate upcoming expenses for next 2-3 days based on recurring expenses
   const upcomingExpenses = useMemo(() => {
     const now = new Date();
     const threeDaysFromNow = new Date();
     threeDaysFromNow.setDate(now.getDate() + 3);
 
-    return transactions
-      .filter(t => {
-        if (t.type !== 'expense') return false;
-        const transactionDate = new Date(t.date);
-        return transactionDate >= now && transactionDate <= threeDaysFromNow;
+    // Filter recurring expenses that are active and have payment dates in the next 3 days
+    return recurringExpenses
+      .filter(expense => expense.isActive)
+      .map(expense => {
+        // Calculate the next payment date for this recurring expense
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const paymentDate = expense.dayOfMonth;
+
+        // Try current month first
+        let paymentDateThisMonth = new Date(currentYear, currentMonth, paymentDate);
+
+        // If payment date for current month has passed, use next month
+        if (paymentDateThisMonth < now) {
+          paymentDateThisMonth = new Date(currentYear, currentMonth + 1, paymentDate);
+        }
+
+        // Check if this payment date is within the next 3 days
+        if (paymentDateThisMonth >= now && paymentDateThisMonth <= threeDaysFromNow) {
+          return {
+            id: expense.id,
+            description: expense.name, // Use name instead of description
+            amount: expense.amount,
+            category: expense.category,
+            date: paymentDateThisMonth.toISOString(),
+            // Add additional fields to match the expected interface
+            type: 'expense' as const,
+            userId: expense.userId,
+            cardId: expense.cardId,
+            isRecurring: true
+          };
+        }
+
+        return null;
       })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .filter(expense => expense !== null)
+      .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime())
       .slice(0, 5); // Show up to 5 upcoming expenses
-  }, [transactions]);
+  }, [recurringExpenses]);
 
   // Calculate stats reactively from real-time data
   const stats = useMemo(() => {
@@ -56,24 +155,25 @@ function DashboardContent() {
     const debitCards = cards.filter(card => card.type === 'debit');
 
     // Credit cards: show available credit (limit - balance)
-    const creditBalance = creditCards.reduce((sum, card) => {
-      return sum + ((card.limit || 0) - card.balance);
+    const creditBalance = creditCards.reduce((sum: number, card: any) => {
+      const limit = card.limit || card.creditLimit || 0;
+      return sum + (limit - card.balance);
     }, 0);
 
     // Debit cards: show actual balance
-    const debitBalance = debitCards.reduce((sum, card) => sum + card.balance, 0);
+    const debitBalance = debitCards.reduce((sum: number, card: any) => sum + card.balance, 0);
 
     // Total available funds
     const totalBalance = debitBalance + creditBalance;
 
     // Calculate income/expenses from all transactions (not just recent ones)
     const income = transactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t: any) => t.type === 'income')
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
 
     const expenses = transactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t: any) => t.type === 'expense')
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
 
     // Calculate total savings balance
     const totalSavingsBalance = savingsAccounts.reduce((sum, account) => sum + account.balance, 0);
@@ -92,15 +192,49 @@ function DashboardContent() {
 
   const handleAddTransactionClick = async () => {
     if (!hasCards) {
-      router.push('/cards');
+      // Fast navigation to cards page when no cards exist
+      router.replace('/cards');
       return;
     }
+    setDefaultTransactionType('expense'); // Default to expense for main button
     setShowTransactionModal(true);
   };
 
-  const handleTransactionSuccess = () => {
-    setShowTransactionModal(false);
-    // Could add refresh logic here if needed
+  // Load budgets
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = BudgetService.subscribeToBudgets(user.uid, (budgetData) => {
+      setBudgets(budgetData);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  const handleBudgetSuccess = useCallback(() => {
+    // Refresh budgets will happen automatically through subscription
+    console.log('Budget created successfully');
+  }, []);
+
+  const handleTransactionSuccess = useCallback(() => {
+    // Refresh transactions will happen automatically through useTransactions hook
+    console.log('Transaction added successfully');
+  }, []);
+
+  const handleEditBudget = (budget: Budget) => {
+    setSelectedBudget(budget);
+    setShowBudgetModal(true);
+  };
+
+  const handleDeleteBudget = async (budgetId: string) => {
+    if (window.confirm('Are you sure you want to delete this budget?')) {
+      try {
+        await BudgetService.delete(budgetId);
+        console.log('Budget deleted successfully');
+      } catch (error) {
+        console.error('Error deleting budget:', error);
+      }
+    }
   };
 
   if (loading) {
@@ -232,30 +366,65 @@ function DashboardContent() {
         {/* Quick Actions */}
         <div className="mb-12">
           <h2 className="text-xl font-serif mb-6" style={{ color: 'var(--color-text-primary)' }}>Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <button
-              className="p-4 backdrop-blur-sm hover:bg-slate-900/50 transition-colors text-center"
-              style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
-              onClick={() => router.push('/cards')}
+              onClick={() => {
+                setDefaultTransactionType('expense');
+                setShowTransactionModal(true);
+              }}
+              className="group p-4 bg-slate-800/50 hover:bg-slate-700/70 border border-slate-600 hover:border-amber-500/50 transition-all duration-200 text-center rounded-lg backdrop-blur-sm"
             >
-              <div className="text-2xl mb-2" style={{ color: 'var(--color-accent)' }}>💳</div>
-              <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>My Cards</span>
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200" style={{ color: 'var(--color-accent)' }}>💰</div>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Add Expense</span>
+              <div className="text-xs mt-1 opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>Track spending</div>
             </button>
+
             <button
-              className="p-4 backdrop-blur-sm hover:bg-slate-900/50 transition-colors text-center"
-              style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+              onClick={() => {
+                setDefaultTransactionType('income');
+                setShowTransactionModal(true);
+              }}
+              className="group p-4 bg-slate-800/50 hover:bg-slate-700/70 border border-slate-600 hover:border-green-500/50 transition-all duration-200 text-center rounded-lg backdrop-blur-sm"
+            >
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200" style={{ color: 'var(--color-success)' }}>💵</div>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Add Income</span>
+              <div className="text-xs mt-1 opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>Record earnings</div>
+            </button>
+
+            <button
               onClick={() => router.push('/transactions')}
+              className="group p-4 bg-slate-800/50 hover:bg-slate-700/70 border border-slate-600 hover:border-blue-500/50 transition-all duration-200 text-center rounded-lg backdrop-blur-sm"
             >
-              <div className="text-2xl mb-2" style={{ color: 'var(--color-success)' }}>📊</div>
-              <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Transactions</span>
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200" style={{ color: 'var(--color-accent)' }}>📊</div>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Transactions</span>
+              <div className="text-xs mt-1 opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>View history</div>
             </button>
+
             <button
-              className="p-4 backdrop-blur-sm hover:bg-slate-900/50 transition-colors text-center"
-              style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
-              onClick={() => router.push('/savings')}
+              onClick={() => setShowBudgetModal(true)}
+              className="group p-4 bg-slate-800/50 hover:bg-slate-700/70 border border-slate-600 hover:border-purple-500/50 transition-all duration-200 text-center rounded-lg backdrop-blur-sm"
             >
-              <div className="text-2xl mb-2" style={{ color: 'var(--color-warning)' }}>💰</div>
-              <span className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Savings</span>
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200" style={{ color: 'var(--color-warning)' }}>🎯</div>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Create Budget</span>
+              <div className="text-xs mt-1 opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>Set limits</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/ai')}
+              className="group p-4 bg-slate-800/50 hover:bg-slate-700/70 border border-slate-600 hover:border-amber-500/50 transition-all duration-200 text-center rounded-lg backdrop-blur-sm"
+            >
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200" style={{ color: 'var(--color-accent)' }}>🤖</div>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>AI Assistant</span>
+              <div className="text-xs mt-1 opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>Get advice</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/cards')}
+              className="group p-4 bg-slate-800/50 hover:bg-slate-700/70 border border-slate-600 hover:border-cyan-500/50 transition-all duration-200 text-center rounded-lg backdrop-blur-sm"
+            >
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200" style={{ color: 'var(--color-success)' }}>💳</div>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Manage Cards</span>
+              <div className="text-xs mt-1 opacity-70" style={{ color: 'var(--color-text-tertiary)' }}>Add accounts</div>
             </button>
           </div>
         </div>
@@ -360,6 +529,72 @@ function DashboardContent() {
           </div>
         </div>
 
+        {/* Budgets Section */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-0.5 bg-linear-to-r from-amber-400 to-transparent"></div>
+              <h2 className="text-2xl font-serif text-slate-100 tracking-wide">Budget Overview</h2>
+            </div>
+            <button
+              onClick={() => setShowBudgetModal(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md"
+            >
+              <span className="text-lg">+</span>
+              <span className="hidden sm:inline">Create Budget</span>
+              <span className="sm:hidden">Budget</span>
+            </button>
+          </div>
+
+          <div className="backdrop-blur-sm" style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}>
+            {budgets.length > 0 ? (
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {budgets.slice(0, 6).map((budget) => (
+                    <BudgetCard
+                      key={budget.id}
+                      budget={budget}
+                      onEdit={handleEditBudget}
+                      onDelete={handleDeleteBudget}
+                    />
+                  ))}
+                </div>
+
+                {budgets.length > 6 && (
+                  <div className="mt-6 pt-6 border-t border-slate-700 text-center">
+                    <button
+                      onClick={() => router.push('/budgets')}
+                      className="text-sm tracking-wider uppercase hover:opacity-80 transition-opacity"
+                      style={{ color: 'var(--color-accent)' }}
+                    >
+                      View All {budgets.length} Budgets →
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-amber-400 mb-4">
+                  <Lucide.Target className="h-12 w-12 sm:h-16 sm:w-16 mx-auto opacity-80" />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-serif text-slate-100 mb-3 font-semibold">No Budgets Yet</h3>
+                <p className="text-slate-300 mb-6 sm:mb-8 text-sm sm:text-base tracking-wide px-4 font-medium">
+                  Create budgets to track spending limits and reach your financial goals
+                </p>
+                <button
+                  onClick={() => setShowBudgetModal(true)}
+                  className="px-6 py-3 border-2 border-amber-600 text-amber-400 hover:bg-amber-600/20 hover:border-amber-500 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px] font-semibold shadow-lg hover:shadow-amber-500/20"
+                >
+                  Create Your First Budget
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Analytics & Insights */}
+        <DashboardAnalytics />
+
         {/* Recent Activity */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-8">
@@ -378,21 +613,46 @@ function DashboardContent() {
 
           <div className="space-y-1">
             {transactions.slice(0, 3).length > 0 ? (
-              transactions.slice(0, 3).map((transaction) => (
-                <div key={transaction.id} className="py-6 hover:bg-slate-900/30 transition-colors" style={{ borderBottomColor: 'var(--color-border)' }}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div className="w-1 h-12" style={{ backgroundColor: transaction.type === 'income' ? 'var(--color-success)' : 'var(--color-accent)' }}></div>
-                      <div>
-                        <div className="font-serif mb-1" style={{ color: 'var(--color-text-primary)' }}>{transaction.description}</div>
-                        <div className="text-xs tracking-wider uppercase" style={{ color: 'var(--color-text-tertiary)' }}>{transaction.category}</div>
+              transactions.slice(0, 3).map((transaction: any) => (
+                isMobile ? (
+                  <SwipeableTransactionCard
+                    key={transaction.id}
+                    transaction={{
+                      id: transaction.id,
+                      description: transaction.description,
+                      amount: transaction.amount,
+                      category: transaction.category,
+                      type: transaction.type === 'income' ? 'income' : 'expense',
+                      date: typeof transaction.date === 'string' ? transaction.date : transaction.date.toISOString(),
+                    }}
+                    onEdit={() => {
+                      // Could implement edit functionality
+                      console.log('Edit transaction:', transaction.id);
+                    }}
+                    onDelete={() => {
+                      if (window.confirm('Delete this transaction?')) {
+                        console.log('Delete transaction:', transaction.id);
+                        // Could implement delete functionality
+                      }
+                    }}
+                    className="mb-2"
+                  />
+                ) : (
+                  <div key={transaction.id} className="py-6 hover:bg-slate-900/30 transition-colors" style={{ borderBottomColor: 'var(--color-border)' }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-6">
+                        <div className="w-1 h-12" style={{ backgroundColor: transaction.type === 'income' ? 'var(--color-success)' : 'var(--color-accent)' }}></div>
+                        <div>
+                          <div className="font-serif mb-1" style={{ color: 'var(--color-text-primary)' }}>{transaction.description}</div>
+                          <div className="text-xs tracking-wider uppercase" style={{ color: 'var(--color-text-tertiary)' }}>{transaction.category}</div>
+                        </div>
+                      </div>
+                      <div className="font-serif text-lg sm:text-xl break-all max-w-full" style={{ color: transaction.type === 'income' ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+                        {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
                       </div>
                     </div>
-                    <div className="font-serif text-lg sm:text-xl break-all max-w-full" style={{ color: transaction.type === 'income' ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
-                      {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
-                    </div>
                   </div>
-                </div>
+                )
               ))
             ) : (
               <div className="text-center py-12 font-serif" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -403,11 +663,15 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Add Transaction Modal */}
-      <AddTransactionModal
-        isOpen={showTransactionModal}
-        onClose={() => setShowTransactionModal(false)}
-        onSuccess={handleTransactionSuccess}
+      {/* Create Budget Modal */}
+      <CreateBudgetModal
+        isOpen={showBudgetModal}
+        onClose={() => {
+          setShowBudgetModal(false);
+          setSelectedBudget(null);
+        }}
+        onSuccess={handleBudgetSuccess}
+        initialCategory={selectedBudget?.category}
       />
 
       {/* Cards Breakdown Modal */}
@@ -416,6 +680,14 @@ function DashboardContent() {
         onClose={() => setShowCardsModal(false)}
         cards={cards}
         type={selectedCardType}
+      />
+
+      {/* Add Transaction Modal */}
+      <AddTransactionModal
+        isOpen={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        onSuccess={handleTransactionSuccess}
+        defaultType={defaultTransactionType}
       />
     </>
   );

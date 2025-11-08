@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAccessControl } from '@/lib/services/accessControlService';
 import { CardDisplay } from '@/components/cards/CardDisplay';
-import { Edit2, Trash2, Plus, Award } from 'lucide-react';
+import * as Lucide from 'lucide-react';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { useCards } from '@/hooks/useCards';
 import { cardsService } from '@/lib/firebase/firestore';
@@ -24,22 +24,15 @@ function CardsPageContent() {
 
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [cardToDelete, setCardToDelete] = useState<Card | null>(null);
 
-  // Calculate total balance correctly:
-  // - Credit cards: available credit (limit - balance)
-  // - Debit cards: actual balance
-  const totalBalance = cards.reduce((sum, card) => {
-    if (card.type === 'credit') {
-      // For credit cards, show available credit
-      return sum + ((card.limit || 0) - card.balance);
-    } else {
-      // For debit cards, show actual balance
-      return sum + card.balance;
-    }
-  }, 0);
+  // Removed total balance calculation as it was confusing to aggregate credit available and debit balances
 
-  if (loading) {
+  // Show loading only when we have cards but they're still loading
+  // If no cards exist, show the no-cards state immediately for instant UX
+  if (loading && cards.length > 0) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-amber-400 text-lg font-serif tracking-wider">Loading...</div>
@@ -100,18 +93,26 @@ function CardsPageContent() {
     setShowEditModal(true);
   };
 
-  const handleDeleteClick = async (cardId: string) => {
-    if (window.confirm('Are you sure you want to delete this card?')) {
-      try {
-        if (user) {
-          await cardsService.delete(cardId);
-          // Data will update automatically through real-time hooks
-          toast.success('Card deleted successfully');
-        }
-      } catch (error) {
-        console.error('Error deleting card:', error);
-        toast.error('Unable to delete this card. Please try again or contact support if the problem persists.');
+  const handleDeleteClick = (card: Card) => {
+    setCardToDelete(card);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!cardToDelete) return;
+
+    try {
+      if (user) {
+        await cardsService.delete(cardToDelete.id);
+        // Data will update automatically through real-time hooks
+        toast.success('Card deleted successfully');
       }
+    } catch (error) {
+      console.error('Error deleting card:', error);
+      toast.error('Unable to delete this card. Please try again or contact support if the problem persists.');
+    } finally {
+      setShowDeleteModal(false);
+      setCardToDelete(null);
     }
   };
 
@@ -123,6 +124,50 @@ function CardsPageContent() {
         onClose={() => setShowModal(false)}
         onSuccess={handleAddSuccess}
       />
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && cardToDelete && (
+        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-slate-950 border border-red-700/30 rounded-lg shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-600/20 rounded-full flex items-center justify-center">
+                  <Lucide.AlertTriangle className="h-6 w-6 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-serif text-slate-100 tracking-wide">Delete Card</h3>
+                  <p className="text-sm text-slate-400">This action cannot be undone</p>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-slate-300 mb-2">
+                  Are you sure you want to delete this card?
+                </p>
+                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                  <p className="text-slate-200 font-medium">{cardToDelete.name || 'Unnamed Card'}</p>
+                  <p className="text-slate-400 text-sm">****{cardToDelete.lastFour || '****'}</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 px-4 py-2 border border-slate-700 text-slate-400 hover:bg-slate-800 transition-colors tracking-wider uppercase text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="flex-1 px-4 py-2 bg-red-600 text-slate-900 hover:bg-red-500 transition-colors tracking-wider uppercase text-sm font-semibold"
+                >
+                  Delete Card
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {selectedCard && (
         <EditCardModal
@@ -146,27 +191,15 @@ function CardsPageContent() {
           <div className="w-12 sm:w-16 md:w-20 h-0.5 bg-linear-to-r from-transparent via-amber-400 to-transparent mx-auto sm:mx-0 mb-3 sm:mb-4"></div>
           <p className="text-slate-400 text-xs sm:text-sm tracking-widest uppercase">Payment Methods</p>
         </div>
-        <button
-          onClick={handleAddCardClick}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
-        >
-          {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-          Add Card
-        </button>
-      </div>
-
-      {/* Total Balance */}
-      <div className="bg-linear-to-br from-amber-900/30 via-slate-900/60 to-slate-900/30 border border-amber-700/40 rounded-lg p-6 sm:p-8 md:p-10 lg:p-12 backdrop-blur-sm">
-        <div className="text-center">
-          <div className="text-amber-400 text-xs tracking-widest uppercase mb-3 sm:mb-4 font-serif font-semibold">Total Available Funds</div>
-          <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-slate-100 mb-2 font-bold">{formatAmount(totalBalance)}</div>
-          <div className="text-slate-400 text-sm tracking-wider font-medium">
-            Across {cards.length} Card{cards.length !== 1 ? 's' : ''}
-            <span className="block text-xs text-slate-500 mt-1">
-              (Credit: Available | Debit: Balance)
-            </span>
-          </div>
+        
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <button
+            onClick={handleAddCardClick}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
+          >
+            <Lucide.Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+            Add Card
+          </button>
         </div>
       </div>
 
@@ -180,47 +213,23 @@ function CardsPageContent() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
             {cards.map((card) => (
-              <div key={card.id} className="relative">
-                <CardDisplay card={card} />
-                
-                {/* Action Buttons - Modern Design - Hidden when modals are open or sidebar is open */}
-                {!(showModal || showEditModal) && (
-                  <div className="absolute top-4 right-4 flex gap-2 z-20">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(card);
-                      }}
-                      className="group relative w-10 h-10 bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation"
-                      aria-label="Edit card"
-                    >
-                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                      <Edit2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-blue-500/30 to-purple-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(card.id);
-                      }}
-                      className="group relative w-10 h-10 bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-md border-2 border-white/30 hover:border-white/40 text-white rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center touch-manipulation"
-                      aria-label="Delete card"
-                    >
-                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                      <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                      <div className="absolute inset-0 rounded-full bg-linear-to-br from-red-500/30 to-orange-500/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                    </button>
-                  </div>
-                )}
-              </div>
+              <CardDisplay
+                key={card.id}
+                card={card}
+                onEdit={handleEditClick}
+                onDelete={(cardId) => {
+                  const cardToDelete = cards.find(c => c.id === cardId);
+                  if (cardToDelete) handleDeleteClick(cardToDelete);
+                }}
+                showActions={!(showModal || showEditModal || showDeleteModal)}
+              />
             ))}
           </div>
         </div>
       ) : (
         <div className="text-center py-12 sm:py-16 md:py-20 border border-slate-800 bg-slate-900/40 rounded-lg backdrop-blur-sm">
           <div className="text-amber-400 mb-4">
-            {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-            <Award className="h-12 w-12 sm:h-16 sm:w-16 mx-auto opacity-80" />
+            <Lucide.Award className="h-12 w-12 sm:h-16 sm:w-16 mx-auto opacity-80" />
           </div>
           <h3 className="text-xl sm:text-2xl font-serif text-slate-100 mb-3 font-semibold">No Cards Yet</h3>
           <p className="text-slate-300 mb-6 sm:mb-8 text-sm sm:text-base tracking-wide px-4 font-medium">Begin your premium financial journey</p>

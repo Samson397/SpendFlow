@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { recurringExpensePaymentService } from '@/lib/services/recurringExpensePayments';
 import { creditCardPaymentService } from '@/lib/services/creditCardPayments';
+import { notificationService } from '@/lib/services/notificationService';
 
 /**
  * Hook to automatically process recurring expenses when user logs in
@@ -34,13 +35,17 @@ export function useRecurringExpenseProcessor() {
         console.log('🔄 Processing recurring expenses and credit card payments...');
         
         // Process recurring expenses
-        await recurringExpensePaymentService.processDueExpenses(user.uid);
+        await recurringExpensePaymentService.processDueExpenses(user.uid, user.email);
         console.log('✅ Recurring expenses processed');
         
         // Process credit card payments
         await creditCardPaymentService.processDuePayments(user.uid);
         console.log('✅ Credit card payments processed');
-        
+
+        // Check for upcoming insufficient funds warnings
+        await notificationService.checkUpcomingInsufficientFunds(user.uid);
+        console.log('✅ Insufficient funds check completed');
+
         // Mark as processed
         hasProcessedToday.current = true;
         lastProcessedDate.current = today;

@@ -45,6 +45,7 @@ type CurrencyContextType = {
   setCurrency: (code: string) => void;
   formatAmount: (amount: number) => string;
   availableCurrencies: Currency[];
+  detectCurrencyFromLocation: () => Promise<void>;
 };
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -52,7 +53,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrencyState] = useState<Currency>(currencies.USD);
 
-  const detectCurrency = async () => {
+  const detectCurrencyFromLocation = async () => {
     try {
       // Try to detect from browser locale first
       const browserLocale = navigator.language;
@@ -74,8 +75,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         setCurrencyState(currencies[detectedCurrency]);
       }
     } catch (error) {
-      console.log('Could not detect currency, using USD as default');
-      // Keep USD as default
+      console.log('Could not detect currency, keeping current currency');
+      // Keep current currency instead of forcing USD
     }
   };
 
@@ -88,7 +89,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     }
 
     // Auto-detect based on location
-    detectCurrency();
+    detectCurrencyFromLocation();
   }, []);
 
   const setCurrency = (code: string) => {
@@ -110,7 +111,13 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const availableCurrencies = Object.values(currencies);
 
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, formatAmount, availableCurrencies }}>
+    <CurrencyContext.Provider value={{
+      currency,
+      setCurrency,
+      formatAmount,
+      availableCurrencies,
+      detectCurrencyFromLocation
+    }}>
       {children}
     </CurrencyContext.Provider>
   );

@@ -3,12 +3,15 @@ import { db } from '@/firebase/config';
 import { RecurringExpense } from '@/types/recurring';
 import { Card } from '@/types';
 
+// Import notification service
+import { notificationService } from './notificationService';
+
 export const recurringExpensePaymentService = {
   /**
    * Process recurring expenses that are due today
    * This should be run daily (via cron job or manual trigger)
    */
-  async processDueExpenses(userId: string): Promise<void> {
+  async processDueExpenses(userId: string, userEmail?: string | null): Promise<void> {
     const today = new Date();
     const currentDay = today.getDate();
     const currentMonth = today.toISOString().slice(0, 7); // YYYY-MM
@@ -36,14 +39,14 @@ export const recurringExpensePaymentService = {
 
     // Process each expense
     for (const expense of expensesDueToday) {
-      await this.processExpense(expense);
+      await this.processExpense(expense, userEmail);
     }
   },
 
   /**
    * Process a single recurring expense
    */
-  async processExpense(expense: RecurringExpense): Promise<void> {
+  async processExpense(expense: RecurringExpense, userEmail?: string | null): Promise<void> {
     try {
       // Get the payment card
       const cardDoc = await getDocs(
@@ -102,7 +105,16 @@ export const recurringExpensePaymentService = {
       console.log(`✅ Recurring expense processed: ${expense.name} - $${expense.amount}`);
     } catch (error) {
       console.error(`Error processing recurring expense ${expense.name}:`, error);
-      
+
+      // Notify user about failed payment
+      await notificationService.notifyFailedPayment(
+        expense.userId,
+        userEmail,
+        expense.name,
+        expense.amount,
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+
       // Log failed processing attempt
       await addDoc(collection(db, 'recurringExpenseErrors'), {
         recurringExpenseId: expense.id,

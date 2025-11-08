@@ -1,10 +1,21 @@
 // Export all subscription types
-export * from './subscription';
+// export * from './subscription';
 
 // Legacy exports for backward compatibility
-export type { SubscriptionInfo } from './subscription';
-export type { PlanLimits } from './subscription';
+// export type { SubscriptionInfo } from './subscription';
+// export type { PlanLimits } from './subscription';
 export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+
+export interface PlanLimits {
+  maxCards: number;
+  maxTransactions: number;
+  analytics: boolean;
+  export: boolean;
+  prioritySupport: boolean;
+  apiAccess: boolean;
+  teamManagement: boolean;
+  customIntegrations: boolean;
+}
 
 export interface UserProfile {
   id: string;

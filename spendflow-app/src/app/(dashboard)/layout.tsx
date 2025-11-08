@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Sidebar from '@/components/layout/Sidebar';
@@ -13,12 +13,34 @@ import { useRouter } from 'next/navigation';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import Link from 'next/link';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+import { useLocationBasedCurrency } from '@/hooks/useLocationBasedCurrency';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useRecurringExpenseProcessor();
+  useLocationBasedCurrency(); // Automatically detect currency based on location
+
+  // Pull-to-refresh function for mobile
+  const handlePullToRefresh = useCallback(async () => {
+    console.log('🔄 Pull-to-refresh triggered');
+
+    // Force refresh of key data
+    try {
+      // Trigger any data refreshes needed
+      // The real-time hooks should automatically update, but we can force a refresh
+
+      // Add a small delay to show the refresh animation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      console.log('✅ Pull-to-refresh completed');
+    } catch (error) {
+      console.error('❌ Pull-to-refresh failed:', error);
+    }
+  }, []);
 
   // Monitor maintenance mode in real-time and redirect if needed
   useEffect(() => {
@@ -124,15 +146,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <div className="flex-1"></div>
 
                   {/* User menu - show on all screens */}
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-3">
+                    <NotificationsBell />
                     <div className="text-sm text-slate-400 mr-4">
-                      {user?.email?.split('@')[0]}
+                      {user?.displayName || user?.email?.split('@')[0] || 'User'}
                     </div>
                     <button
-                      onClick={() => {
-                        // Sign out functionality would go here
-                        window.location.href = '/';
-                      }}
+                      onClick={logout}
                       className="text-slate-300 hover:text-amber-400 transition-colors px-3 py-2 text-sm font-medium"
                     >
                       Sign Out
@@ -144,14 +164,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 {mobileMenuOpen && (
                   <div className="md:hidden border-t border-slate-800">
                     <div className="px-2 pt-2 pb-3 space-y-1 bg-slate-900/95">
-                      <div className="px-3 py-2 text-slate-400 text-sm border-b border-slate-700 mb-2">
-                        Welcome, {user?.email?.split('@')[0]}
+                      <div className="px-3 py-2 text-slate-400 text-sm border-b border-slate-700 mb-2 flex items-center justify-between">
+                        <span>Welcome, {user?.displayName || user?.email?.split('@')[0] || 'User'}</span>
+                        <NotificationsBell className="scale-75" />
                       </div>
                       <button
                         onClick={() => {
                           setMobileMenuOpen(false);
-                          // Sign out functionality would go here
-                          window.location.href = '/';
+                          logout();
                         }}
                         className="block w-full text-left px-3 py-2 text-base font-medium text-slate-300 hover:text-amber-400 hover:bg-slate-800/50 rounded-md"
                       >
@@ -164,11 +184,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </header>
 
             <main className="flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 md:pt-12">
-              <div className="px-3 py-4 sm:px-4 sm:py-6 w-full">
-                <div className="max-w-7xl mx-auto w-full min-h-[calc(100vh-4rem)]">
-                  {children}
+              <PullToRefresh
+                onRefresh={handlePullToRefresh}
+                className="h-full"
+              >
+                <div className="px-3 py-4 sm:px-4 sm:py-6 w-full">
+                  <div className="max-w-7xl mx-auto w-full min-h-[calc(100vh-4rem)]">
+                    {children}
+                  </div>
                 </div>
-              </div>
+              </PullToRefresh>
             </main>
             <Footer />
           </div>

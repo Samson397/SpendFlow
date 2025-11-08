@@ -92,7 +92,7 @@ function TransactionsPageContent() {
 
   const largestTransaction = transactions.length > 0
     ? Math.max(...transactions.map(t => t.amount))
-    : null;
+    : 0;
 
   if (loading) {
     return (
@@ -190,7 +190,7 @@ function TransactionsPageContent() {
               <span className="text-lg">🏆</span>
               <div className="text-slate-500 text-xs tracking-widest uppercase font-serif">Largest Transaction</div>
             </div>
-            <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{largestTransaction ? formatAmount(largestTransaction) : 'N/A'}</div>
+            <div className="text-2xl sm:text-3xl md:text-4xl font-serif text-slate-100">{formatAmount(largestTransaction)}</div>
           </div>
         </div>
       </div>
@@ -245,7 +245,7 @@ function TransactionsPageContent() {
                       <div className="flex items-center gap-4 text-xs text-slate-600 tracking-wider">
                         <span className="uppercase">{transaction.category}</span>
                         <span>•</span>
-                        <span>{transaction.date ? format(new Date(transaction.date), 'MMM dd, yyyy') : 'N/A'}</span>
+                        <span>{transaction.date ? format(new Date(transaction.date), 'MMM dd, yyyy') : 'No date'}</span>
                       </div>
                     </div>
                   </div>

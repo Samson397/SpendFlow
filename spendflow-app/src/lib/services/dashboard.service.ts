@@ -97,7 +97,18 @@ export const dashboardService = {
 
   async calculateTotalBalance(userId: string): Promise<number> {
     const cards = await cardsService.getByUserId(userId);
-    return cards.reduce((sum: number, card: Card) => sum + (card.balance || 0), 0);
+    return cards.reduce((sum: number, card: Card) => {
+      if (card.type === 'credit') {
+        // Credit cards: balance = available credit remaining
+        // Amount owed = credit limit - available credit
+        const creditLimit = card.creditLimit || card.limit || 0;
+        const amountOwed = creditLimit - (card.balance || 0);
+        return sum - amountOwed; // Subtract the debt/liability
+      } else {
+        // Debit/savings cards: balance = money they have (asset)
+        return sum + (card.balance || 0);
+      }
+    }, 0);
   },
 
   async getIncomeVsExpensesData(

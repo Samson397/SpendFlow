@@ -50,6 +50,8 @@ export function useTransactions(userId: string | undefined, options?: {
       // One-time fetch
       fetchTransactions();
     }
+
+    return undefined;
   }, [userId, options?.realtime, options?.limit, fetchTransactions]);
 
   const refresh = useCallback(() => {

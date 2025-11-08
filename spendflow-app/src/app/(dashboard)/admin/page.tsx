@@ -285,7 +285,8 @@ export default function AdminPage() {
               // For credit cards: show available credit (limit - balance)
               // For debit cards: show balance
               if (card.type === 'credit') {
-                totalBalance += (card.limit || 0) - (card.balance || 0);
+                const limit = card.limit || card.creditLimit || 0;
+                totalBalance += limit - (card.balance || 0);
               } else {
                 totalBalance += card.balance || 0;
               }

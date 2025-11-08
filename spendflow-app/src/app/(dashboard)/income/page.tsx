@@ -141,7 +141,7 @@ function IncomePageContent() {
               <button
                 onClick={() => {
                   setShowNoCardsMessage(false);
-                  router.push('/cards');
+                  router.replace('/cards'); // Fast navigation to cards page
                 }}
                 className="w-full px-6 py-3 border border-amber-600 text-amber-400 hover:bg-amber-600/10 transition-colors tracking-wider uppercase text-sm rounded-md touch-manipulation min-h-[44px]"
               >

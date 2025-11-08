@@ -7,7 +7,7 @@ import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp, addDoc,
 import { db } from '@/firebase/config';
 import toast from 'react-hot-toast';
 import { ShieldCheckIcon, ArrowLeftIcon, TagIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { Reply, Send, X } from 'lucide-react';
+import * as Lucide from 'lucide-react';
 import Link from 'next/link';
 
 interface ContactMessage {
@@ -408,8 +408,7 @@ export default function AdminMessagesPage() {
                               className="p-1 rounded text-blue-400 hover:bg-blue-900/30"
                               title="Reply to message"
                             >
-                              {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                              <Reply className="h-4 w-4" />
+                              <Lucide.Reply className="h-4 w-4" />
                             </button>
                           )}
                           <button
@@ -516,8 +515,7 @@ export default function AdminMessagesPage() {
                               <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
                             ) : (
                               <>
-                                {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                                <Send className="h-3 w-3" />
+                                <Lucide.Send className="h-3 w-3" />
                                 Send Reply
                               </>
                             )}
@@ -534,8 +532,7 @@ export default function AdminMessagesPage() {
                       onClick={() => setReplyingTo(selectedMessage.id)}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
                     >
-                      {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                      <Reply className="h-4 w-4" />
+                      <Lucide.Reply className="h-4 w-4" />
                       Reply
                     </button>
                   )}
@@ -623,8 +620,7 @@ export default function AdminMessagesPage() {
                         <div className="animate-spin rounded-full h-4 w-4 border border-white border-t-transparent"></div>
                       ) : (
                         <>
-                          {/* @ts-expect-error Conflicting React types between lucide-react and project */}
-                          <Send className="h-4 w-4" />
+                          <Lucide.Send className="h-4 w-4" />
                           Send Reply
                         </>
                       )}

@@ -12,15 +12,11 @@ const nextConfig = {
   },
 
   // Performance optimizations
-  swcMinify: true,
   compress: true,
   
   // Reduce bundle size
   // Removed modularizeImports for lucide-react as it causes build errors
   // lucide-react already tree-shakes automatically
-
-  // Optimize fonts
-  optimizeFonts: true,
 
   // Enable React strict mode for better performance
   reactStrictMode: true,

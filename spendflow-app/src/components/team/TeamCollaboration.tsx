@@ -223,6 +223,7 @@ export function TeamCollaboration() {
           onClose={() => setShowNewExpense(false)}
           onCreate={handleCreateSharedExpense}
           teamMembers={teamMembers}
+          user={user}
         />
       )}
     </div>
@@ -300,10 +301,11 @@ function InviteMemberModal({ onClose, onInvite }: {
   );
 }
 
-function NewSharedExpenseModal({ onClose, onCreate, teamMembers }: {
+function NewSharedExpenseModal({ onClose, onCreate, teamMembers, user }: {
   onClose: () => void;
   onCreate: (expense: Omit<SharedExpense, 'id' | 'paidBy' | 'paidByName'>) => void;
   teamMembers: TeamMember[];
+  user: any;
 }) {
   const [formData, setFormData] = useState({
     title: '',
@@ -324,7 +326,13 @@ function NewSharedExpenseModal({ onClose, onCreate, teamMembers }: {
       category: formData.category,
       splitBetween: formData.splitBetween,
       date: new Date(formData.date),
-      description: formData.description.trim() || undefined
+      description: formData.description.trim() || undefined,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      currency: 'USD',
+      createdBy: user?.uid || '',
+      teamId: '' // TODO: Get from team context or service
     });
   };
 
